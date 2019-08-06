@@ -2,20 +2,33 @@
 title: "SOCS-SOC"
 author: "Stephen Wood"
 date: "8/6/2019"
-output: html_document
+output: md_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+# LOAD PACKAGES
+library(tidyverse)    # For data manipulation
+library(readxl)       # For reading in .xls files
+library(VSURF)        # For random forest model selection
+library(doBy)
+library(lme4)         # For mixed-effects regression
+library(lmerTest)     # For p-value calculations of lmer models
+library(MuMIn)
+library(sjstats)
+library(jtools)       # For effect plots
 ```
 
-## R Markdown
+## Salinas Organic Cropping Systems Experiment
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+### Read in the data files
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+The data are stored in separate files. usda\_soil\_data has the soil
+carbon fractionation data analyzed by Wood, icp has the data analyzed by
+UC Davis, and the other site-level descriptors are in the other files.
 
-```{r cars, echo = FALSE}
+```{r}
 # READ IN ALL DATA FILES
 usda_soil_data <- read_excel("data/usda-soil-data.xlsx") %>%
   mutate(
@@ -48,12 +61,366 @@ inputs <- read_excel("data/site-data.xlsx",
 icp <- read_excel("data/icp.xlsx")
 ```
 
-## Including Plots
+### Data manipulation
 
-You can also embed plots, for example:
+Now we need to do some slight manipulations to rename variables, merge
+the data sets together, and select the variables that we'll want to used
+for analysis.
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+inputsLabels <- colnames(inputs)
+colnames(inputs)[4:18] <- c(
+  "total_compost",
+  "annual_cc_shoot",
+  "total_cc_shoot",
+  "annual_legume_cc_shoot",
+  "total_legume_cc_shoot",
+  "n_fixation",
+  "compost_n",
+  "fertilizer_n",
+  "total_n",
+  "perc_n_from_fixation",
+  "total_veg_residue_shoot",
+  "total_om",
+  "fresh_om",
+  "fresh_om_perc",
+  "total_C_no_roots_no_exudates"
+)
+
+inputs$RepTreat <- paste(inputs$trt, inputs$rep)
+usda_soil_data$RepTreat <- paste(usda_soil_data$Trt_id, usda_soil_data$Replicate)
+bd$RepTreat <- paste(bd$trt, bd$rep)
+icp$RepTreat <- paste(icp$Trt_id, icp$Replicate)
+
+all_data <- merge(usda_soil_data, bd, by = "RepTreat") %>%
+  select(RepTreat, System, Replicate, Trt_id, cover_crop, Compost:POM_CN, blkden) %>%
+  mutate(
+    pom.stock = (`POM C`*blkden*30)/10,
+    pom.n.stock = (`POM N`*blkden*30)/10,
+    maom.stock = (`MAOM C`*blkden*30)/10,
+    maom.n.stock = (`MAOM N`*blkden*30)/10,
+    totC.stock = pom.stock + maom.stock
+  )
+
+all_data <- all_data %>%
+  merge(inputs, by = "RepTreat") %>%
+  select(RepTreat,System,Replicate:totC.stock, total_compost:total_C_no_roots_no_exudates) 
+
+all_data$CC <- recode(all_data$Trt_id,
+                      leg3x="Legume-rye every year",
+                      mus1x="Mustard every year",
+                      nocc="Legume-rye every four years",
+                      noccnocp="Legume-rye every four years",
+                      rye1x="Rye every year")
+
+all_data <- all_data %>%
+  merge(icp %>% select(IC,EC:RepTreat), by="RepTreat")
+
+rm(bd); rm(inputs); rm(usda_soil_data); rm(icp)
+    ```
+
+### Models of management effect on soil fractions
+
+Now that we have the data, let's look through some models. We are going
+to used hierarchical models with a random intercept for replicate block.
+This is to capture random differences among plots within a block.
+
+Let's start with a series of models, using all of the data, and looking
+at the impact on particulate and mineral-associated C and microbial
+biomass.
+
+```{r}
+# Particulate carbon
+lmer(pom.stock ~ Compost + Cover_crop_freq + cover_crop + (1|Replicate),
+     data = all_data
+) -> pom.model
+summary(pom.model)
+r.squaredGLMM(pom.model)
+rm(pom.model)
+
+# Mineral-associated carbon
+lmer(maom.stock ~ Compost + Cover_crop_freq + cover_crop + (1|Replicate),
+     data = all_data
+) -> maom.model
+summary(maom.model)
+r.squaredGLMM(maom.model)
+rm(maom.model)
+
+# Microbial biomass
+lmer(substrate_induced_respiration ~ Compost + Cover_crop_freq + cover_crop + (1|Replicate),
+     data = all_data
+) -> sir.model
+summary(sir.model)
+r.squaredGLMM(sir.model)
+rm(sir.model)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Looking at the model estimates, there does not seem to be a relationship
+between cover crop type and our variables of interest. We could continue
+by dropping that variable from the model and re-running, but that would
+take the average effect of the other variables across systems with
+different cover crops. Even though cover crop type does not have an
+effect in our statistical model, for the remaining comparisons we felt
+that it makes more sense to only look at the variables that we know have
+the same cover crop type.
+
+Let's filter out observations that are not legume rye, and re-run the
+models. We'll also select a smaller set of predictor variables that
+might be of special interest.
+
+```{r}
+leg_rye <- all_data %>%
+filter(cover_crop=="legume-rye") %>%
+select(Replicate, cover_crop, Compost, Cover_crop_freq, organic_matter, 
+       water_holding_capacity,substrate_induced_respiration:POM_CN,pom.stock,
+       pom.n.stock, maom.stock, maom.n.stock, 
+       total_C_no_roots_no_exudates, CEC, pH, `X-Ca`
+)
+
+# Organic matter
+lmer(organic_matter ~ Compost + Cover_crop_freq + (1|Replicate),
+data = leg_rye
+) -> om.model
+summary(om.model)
+r.squaredGLMM(om.model)
+rm(om.model)
+
+# Particulate C
+lmer(pom.stock ~ Compost + Cover_crop_freq + (1|Replicate),
+   data = leg_rye
+) -> pom.model
+summary(pom.model)
+r.squaredGLMM(pom.model)
+rm(pom.model)
+
+# Particulate N
+lmer(pom.n.stock ~ Compost + Cover_crop_freq + (1|Replicate),
+   data = leg_rye
+) -> pom.n.model
+summary(pom.n.model)
+r.squaredGLMM(pom.n.model)
+rm(pom.n.model)
+
+# Mineral-associated C
+lmer(maom.stock ~ Compost + Cover_crop_freq + (1|Replicate),
+   data = leg_rye
+) -> maom.model
+summary(maom.model)
+r.squaredGLMM(maom.model)
+rm(maom.model)
+
+# Mineral-associated N
+lmer(maom.n.stock ~ Compost + Cover_crop_freq + (1|Replicate),
+   data = leg_rye
+) -> maom.n.model
+summary(maom.n.model)
+r.squaredGLMM(maom.n.model)
+rm(maom.n.model)
+```
+    
+For our model of microbial biomass--measured by substrate induced
+respiration--we're going to take a slightly different approach. Whereas
+for the previous models we were mainly interested in how soil fractions
+respond to management, now we think that microbial biomass could depend
+on the stock sizes themselves, which we might want to control for. So we
+can look at including stocks as predictor variables. For this we're
+going to actually keep all of the data, rather than drop cover crop
+type, because visual inspection suggested that microbial biomass might
+be slightly higher with leguminous cover crops.
+
+```{r}
+# SIR
+lmer(substrate_induced_respiration ~ cover_crop + Compost + Cover_crop_freq + (1|Replicate),
+     data = all_data
+) -> sir.model
+summary(sir.model)
+r.squaredGLMM(sir.model)
+rm(sir.model)
+
+# SIR, depending on N input to microbes
+lmer(substrate_induced_respiration ~ cover_crop + Compost + Cover_crop_freq + pom.n.stock + (1|Replicate),
+     data = all_data
+) -> sir.model.cn
+car::vif(sir.model.cn)
+summary(sir.model.cn)
+r.squaredGLMM(sir.model.cn)
+rm(sir.model.cn)
+```
+
+### Predicting soil fractions by continuous inputs
+
+There is a certain feedback between some of the treatments and the
+drivers of soil fraction. For instance, cover crops increase soil carbon
+pools partially because of root exudation. More cover crop biomass can
+lead to more root inputs. On plots with compost, cover crop biomass can
+be greater, which can mean different plots have different amounts of
+carbon going into the soil through cover crops. In other words, cover
+crop frequency is not a perfect categorical variable to capture the
+amount of carbon going belowground.
+
+We estimated the quantitative amount of nitrogen and carbon inputs going
+into the system. Let's fit some models to explore if any of these
+variables predict soil fractions.
+
+First, we're going to use a machine learning algorithm called Random
+Forest to see which of the quantitative input variables are the most
+closely related to the fractions that we're interested in. We're going
+to create a list of all of the different Random Forest models for all of
+our outcomes of interest
+
+```{r}
+rf.res <- list(
+  VSURF(
+    y = all_data$organic_matter,
+    x = all_data %>%
+      select(total_compost:total_C_no_roots_no_exudates),
+    parallel = TRUE
+  ),
+  VSURF(
+    y = all_data$pom.stock,
+    x = all_data %>%
+      select(total_compost:total_C_no_roots_no_exudates),
+    parallel = TRUE
+  ),
+  VSURF(
+    y = all_data$maom.stock,
+    x = all_data %>%
+      select(total_compost:total_C_no_roots_no_exudates),
+    parallel = TRUE
+  ),
+  VSURF(
+    y = all_data$substrate_induced_respiration,
+    x = all_data %>%
+      select(total_compost:total_C_no_roots_no_exudates),
+    parallel = TRUE
+  )
+)
+```
+
+Now we can look at each of these model results and see which variables
+are the most relevant. This Random Forest procedure generates lists of
+variables most suitable for both interpretatoin and prediction. Briefly,
+prediction is more strict in the number of variables. We're not using
+our data for predictive modeling, so we'll look at the variables
+identified for interpretation.
+
+```{r}
+for(i in 1:length(rf.res)){
+  vars = rf.res[[i]]$varselect.interp
+  # Print the response variable
+  print(rf.res[[i]]$call$y)
+  # Print the predictor variables selected
+  all_data %>% 
+    select(total_compost:total_C_no_roots_no_exudates) %>%
+    select(vars) %>% names() %>% print()
+}
+```
+
+Some of these variables are highly correlated with each other so we'll
+select out the ones that we know to be somewhat independent and fit
+models with these.
+
+```{r}
+# Organic matter
+lm.om <- lmer(organic_matter ~ total_C_no_roots_no_exudates + (1 | Replicate), data = all_data)
+summary(lm.om)
+r.squaredGLMM(lm.om)
+rm(lm.om)
+
+# Particulate
+lm.pc <- lmer(pom.stock ~ fresh_om + (1 | Replicate), data = all_data)
+summary(lm.pc)
+r.squaredGLMM(lm.pc)
+rm(lm.pc)
+
+# Mineral
+lm.mc <- lmer(maom.stock ~ total_veg_residue_shoot + annual_legume_cc_shoot + (1 | Replicate), data = all_data)
+summary(lm.mc)
+r.squaredGLMM(lm.mc)
+rm(lm.mc)
+
+# SIR
+lm.sir <- lmer(substrate_induced_respiration ~ annual_cc_shoot + (1 | Replicate), data = all_data)
+summary(lm.sir)
+r.squaredGLMM(lm.sir)
+rm(lm.sir)
+```
+
+A surprising part of these models is how poorly the fixed effects
+predict mineral-associated C, while how well the random effects do. This
+says that there's an important component of among-replicate variation
+that we are not capturing with fixed effects. Since mineral-associated C
+is known to be maintained by physical and chemical properties of the
+soil, there might be some soil properties that explain this variation.
+We would not expect soil properties to be as important to particulate C,
+because that C is mainly in the form of partially broken down plant
+material and it is not as reactive with soil surfaces.
+
+To explore the potential for soil properties to impact
+mineral-associated carbon we used a tool called two-stage least squares
+regression. This approach, which is more commonly used by economists,
+first models the effect of the management practices on
+mineral-associated carbon (we've already done this). Then we want to
+know how much of the left-over variation we can explain with other soil
+properties. To do that, we extract the residuals from the first
+regression and regress those against soil properties we think might be
+important.
+
+Let's start with the management model, even though we've already done
+this above. First we're going to use Random Forest to identify the most
+important management properties for mineral-associated C. Then we'll
+used those predictors in a linear model. We're not using random effects
+because we want to try to explain the variance that the random effects
+were capturing with new fixed effects.
+
+```{r}
+# Determine best management predictors of MAOM
+mgmt <- VSURF(
+  y = all_data$maom.stock,
+  x = all_data %>%
+    select(total_compost:total_C_no_roots_no_exudates),
+  parallel = TRUE
+)
+
+# Fit model with best management predictors
+mgmt.model <- lm(maom.stock ~ Compost + Cover_crop_freq + total_veg_residue_shoot, data = all_data)
+mgmt.model %>% summary()
+```
+
+Now that we have our management model, we can use a Random Forest
+approach to identify the variables related to the residuals of the
+previous model. We can then use those in a model. We'll then plot the
+effect of each of the final selected variables on the residuals. This
+will show which variables are the most important to explaining the
+variation in mineral-associated C that is not explained by management.
+We will also look at model fit statistics (like R2) to see how well this
+model does.
+
+```{r}
+# Find best non-management predictors of model residuals
+soil.prop <- VSURF(
+  y = mgmt.model$residuals,
+  x = all_data %>%
+    select(perc_sand:perc_clay, EC:`Fe (DTPA)`),
+  parallel = TRUE
+)
+
+# Create data frame of resulting variables, also including clay
+resid.data <- data.frame(mgmt.model$residuals, all_data$perc_clay, all_data$`X-K`, all_data$`Ca (SP)`, all_data$`Mn (DTPA)`)
+names(resid.data) <- c("model_residuals", "perc_clay", "K", "Ca", "Mn")
+
+resid.model <- lm(model_residuals ~ perc_clay + K + Ca + Mn, data = resid.data)
+resid.model %>% summary()
+
+effect_plot(model = resid.model, pred = Ca, interval = TRUE, rug = TRUE, plot.points = TRUE, partial.residuals = TRUE)
+
+effect_plot(model = resid.model, pred = K, interval = TRUE, rug = TRUE, plot.points = TRUE, partial.residuals = TRUE)
+
+effect_plot(model = resid.model, pred = perc_clay, interval = TRUE, rug = TRUE, plot.points = TRUE, partial.residuals = TRUE)
+
+effect_plot(model = resid.model, pred = Mn, interval = TRUE, rug = TRUE, plot.points = TRUE, partial.residuals = TRUE)
+```
+    
+The adjusted R2 of this model is over 0.4! That's a huge improvement
+over the management model, which was barely predicting 10% of the
+variation.

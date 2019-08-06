@@ -1,14 +1,6 @@
 Salinas Organic Cropping Systems Experiment
 -------------------------------------------
 
-This document walks through the statistical models used by Wood and
-Brennan in their analysis of soil carbon fractions at the Salinas
-Organic Cropping Systems Experiment. For more information on the methods
-and results, please see the paper. For visualizations, see
-data-analysis.R. We did not generate a markdown for the visualizations
-because not all of the final figures in the manuscript were generated in
-R.
-
 ### Read in the data files
 
 The data are stored in separate files. usda\_soil\_data has the soil
@@ -295,16 +287,16 @@ models. We'll also select a smaller set of predictor variables that
 might be of special interest.
 
     leg_rye <- all_data %>%
-      filter(cover_crop=="legume-rye") %>%
-      select(
-        Replicate, cover_crop, Compost, Cover_crop_freq, organic_matter, water_holding_capacity,
-        substrate_induced_respiration:POM_CN, `POM C`, `MAOM C`, pom.stock, pom.n.stock, maom.stock, maom.n.stock, 
-        total_C_no_roots_no_exudates, CEC, pH, `X-Ca`
-      )
+    filter(cover_crop=="legume-rye") %>%
+    select(Replicate, cover_crop, Compost, Cover_crop_freq, organic_matter, 
+           water_holding_capacity,substrate_induced_respiration:POM_CN,pom.stock,
+           pom.n.stock, maom.stock, maom.n.stock, 
+           total_C_no_roots_no_exudates, CEC, pH, `X-Ca`
+    )
 
     # Organic matter
     lmer(organic_matter ~ Compost + Cover_crop_freq + (1|Replicate),
-      data = leg_rye
+    data = leg_rye
     ) -> om.model
     summary(om.model)
 
@@ -351,7 +343,7 @@ might be of special interest.
 
     # Particulate C
     lmer(pom.stock ~ Compost + Cover_crop_freq + (1|Replicate),
-         data = leg_rye
+       data = leg_rye
     ) -> pom.model
 
     ## boundary (singular) fit: see ?isSingular
@@ -403,7 +395,7 @@ might be of special interest.
 
     # Particulate N
     lmer(pom.n.stock ~ Compost + Cover_crop_freq + (1|Replicate),
-         data = leg_rye
+       data = leg_rye
     ) -> pom.n.model
     summary(pom.n.model)
 
@@ -450,7 +442,7 @@ might be of special interest.
 
     # Mineral-associated C
     lmer(maom.stock ~ Compost + Cover_crop_freq + (1|Replicate),
-         data = leg_rye
+       data = leg_rye
     ) -> maom.model
     summary(maom.model)
 
@@ -495,7 +487,7 @@ might be of special interest.
 
     # Mineral-associated N
     lmer(maom.n.stock ~ Compost + Cover_crop_freq + (1|Replicate),
-         data = leg_rye
+       data = leg_rye
     ) -> maom.n.model
     summary(maom.n.model)
 
@@ -724,6 +716,9 @@ our outcomes of interest
       )
     )
 
+    ## Warning in VSURF_pred.default(x = x, y = y, ntree = ntree, err.interp = interp$err.interp, : Unable to perform prediction step, because the interpretation step
+    ## did not eliminate variables
+
 Now we can look at each of these model results and see which variables
 are the most relevant. This Random Forest procedure generates lists of
 variables most suitable for both interpretatoin and prediction. Briefly,
@@ -736,14 +731,14 @@ identified for interpretation.
       # Print the response variable
       print(rf.res[[i]]$call$y)
       # Print the predictor variables selected
-      all_data %>%
-          select(total_compost:total_C_no_roots_no_exudates) %>%
+      all_data %>% 
+        select(total_compost:total_C_no_roots_no_exudates) %>%
         select(vars) %>% names() %>% print()
     }
 
     ## all_data$organic_matter
-    ## [1] "total_C_no_roots_no_exudates" "fresh_om"                    
-    ## [3] "total_om"                     "total_cc_shoot"              
+    ## [1] "total_C_no_roots_no_exudates" "total_om"                    
+    ## [3] "fresh_om"                     "total_cc_shoot"              
     ## [5] "fresh_om_perc"                "total_compost"               
     ## [7] "compost_n"                   
     ## all_data$pom.stock
@@ -753,14 +748,12 @@ identified for interpretation.
     ## all_data$substrate_induced_respiration
     ## [1] "annual_cc_shoot"
 
-    rm(vars)
-
 Some of these variables are highly correlated with each other so we'll
 select out the ones that we know to be somewhat independent and fit
 models with these.
 
     # Organic matter
-    lm.om <- lmer(organic_matter ~ total_C_no_roots_no_exudates + (1|Replicate), data=all_data)
+    lm.om <- lmer(organic_matter ~ total_C_no_roots_no_exudates + (1 | Replicate), data = all_data)
 
     ## Warning: Some predictor variables are on very different scales: consider
     ## rescaling
@@ -815,7 +808,7 @@ models with these.
     rm(lm.om)
 
     # Particulate
-    lm.pc <- lmer(pom.stock ~ fresh_om + (1|Replicate), data=all_data)
+    lm.pc <- lmer(pom.stock ~ fresh_om + (1 | Replicate), data = all_data)
 
     ## Warning: Some predictor variables are on very different scales: consider
     ## rescaling
@@ -867,7 +860,7 @@ models with these.
     rm(lm.pc)
 
     # Mineral
-    lm.mc <- lmer(maom.stock ~ total_veg_residue_shoot + annual_legume_cc_shoot + (1|Replicate), data=all_data)
+    lm.mc <- lmer(maom.stock ~ total_veg_residue_shoot + annual_legume_cc_shoot + (1 | Replicate), data = all_data)
 
     ## Warning: Some predictor variables are on very different scales: consider
     ## rescaling
@@ -916,7 +909,7 @@ models with these.
     rm(lm.mc)
 
     # SIR
-    lm.sir <- lmer(substrate_induced_respiration ~ annual_cc_shoot + (1|Replicate), data=all_data)
+    lm.sir <- lmer(substrate_induced_respiration ~ annual_cc_shoot + (1 | Replicate), data = all_data)
     summary(lm.sir)
 
     ## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
@@ -990,7 +983,7 @@ were capturing with new fixed effects.
     )
 
     # Fit model with best management predictors
-    mgmt.model <- lm(maom.stock ~ Compost+Cover_crop_freq+total_veg_residue_shoot, data=all_data)
+    mgmt.model <- lm(maom.stock ~ Compost + Cover_crop_freq + total_veg_residue_shoot, data = all_data)
     mgmt.model %>% summary()
 
     ## 
@@ -1028,7 +1021,7 @@ model does.
     soil.prop <- VSURF(
       y = mgmt.model$residuals,
       x = all_data %>%
-        select(perc_sand:perc_clay,EC:`Fe (DTPA)`),
+        select(perc_sand:perc_clay, EC:`Fe (DTPA)`),
       parallel = TRUE
     )
 
@@ -1036,10 +1029,10 @@ model does.
     ## did not eliminate variables
 
     # Create data frame of resulting variables, also including clay
-    resid.data <- data.frame(mgmt.model$residuals,all_data$perc_clay,all_data$`X-K`,all_data$`Ca (SP)`,all_data$`Mn (DTPA)`)
-    names(resid.data) <- c('model_residuals','perc_clay','K','Ca','Mn')
+    resid.data <- data.frame(mgmt.model$residuals, all_data$perc_clay, all_data$`X-K`, all_data$`Ca (SP)`, all_data$`Mn (DTPA)`)
+    names(resid.data) <- c("model_residuals", "perc_clay", "K", "Ca", "Mn")
 
-    resid.model <- lm(model_residuals ~ perc_clay + K + Ca + Mn, data=resid.data)
+    resid.model <- lm(model_residuals ~ perc_clay + K + Ca + Mn, data = resid.data)
     resid.model %>% summary()
 
     ## 
@@ -1064,19 +1057,19 @@ model does.
     ## Multiple R-squared:  0.5442, Adjusted R-squared:  0.4226 
     ## F-statistic: 4.477 on 4 and 15 DF,  p-value: 0.01403
 
-    effect_plot(model=resid.model, pred = Ca, interval = TRUE, rug=TRUE, plot.points = TRUE,partial.residuals=TRUE)
+    effect_plot(model = resid.model, pred = Ca, interval = TRUE, rug = TRUE, plot.points = TRUE, partial.residuals = TRUE)
 
 ![](data-analysis_files/figure-markdown_strict/unnamed-chunk-10-1.png)
 
-    effect_plot(model=resid.model, pred = K, interval = TRUE, rug=TRUE, plot.points = TRUE,partial.residuals=TRUE)
+    effect_plot(model = resid.model, pred = K, interval = TRUE, rug = TRUE, plot.points = TRUE, partial.residuals = TRUE)
 
 ![](data-analysis_files/figure-markdown_strict/unnamed-chunk-10-2.png)
 
-    effect_plot(model=resid.model, pred = perc_clay, interval = TRUE, rug=TRUE, plot.points = TRUE,partial.residuals=TRUE)
+    effect_plot(model = resid.model, pred = perc_clay, interval = TRUE, rug = TRUE, plot.points = TRUE, partial.residuals = TRUE)
 
 ![](data-analysis_files/figure-markdown_strict/unnamed-chunk-10-3.png)
 
-    effect_plot(model=resid.model, pred = Mn, interval = TRUE, rug=TRUE, plot.points = TRUE,partial.residuals=TRUE)
+    effect_plot(model = resid.model, pred = Mn, interval = TRUE, rug = TRUE, plot.points = TRUE, partial.residuals = TRUE)
 
 ![](data-analysis_files/figure-markdown_strict/unnamed-chunk-10-4.png)
 
