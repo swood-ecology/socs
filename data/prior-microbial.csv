@@ -1,0 +1,61 @@
+﻿Replicate,Time,Trt_id,Compost,Cover_crop_freq,cover_crop,Alkaline Phosphatase,B-Glucosidase,B-Glucosaminidase,Aspartase,L-Asparaginase,Dehydrogenase,MB_C,MB_N
+Rep 1,Change over 6 yrs,noccnocp,No,Every 4th winter,Leg-rye,-29,-18,-6,,,,-44,-5
+Rep 1,Change over 6 yrs,nocc,Yes,Every 4th winter,Leg-rye,41,10,8,,,,47,5
+Rep 1,Change over 6 yrs,leg3x,Yes,Every winter,Leg-rye,89,45,16,,,,132,31
+Rep 1,Change over 6 yrs,mus1x,Yes,Every winter,Mustard,51,70,13,,,,111,14
+Rep 1,Change over 6 yrs,rye1x,Yes,Every winter,Rye,15,19,9,,,,149,21
+Rep 2,Change over 6 yrs,noccnocp,No,Every 4th winter,Leg-rye,17,11,-4,,,,-5,3
+Rep 2,Change over 6 yrs,nocc,Yes,Every 4th winter,Leg-rye,21,-11,1,,,,20,4
+Rep 2,Change over 6 yrs,leg3x,Yes,Every winter,Leg-rye,134,61,7,,,,136,7
+Rep 2,Change over 6 yrs,mus1x,Yes,Every winter,Mustard,69,67,13,,,,141,26
+Rep 2,Change over 6 yrs,rye1x,Yes,Every winter,Rye,163,71,22,,,,131,26
+Rep 3,Change over 6 yrs,noccnocp,No,Every 4th winter,Leg-rye,38,-17,2,,,,-38,3
+Rep 3,Change over 6 yrs,nocc,Yes,Every 4th winter,Leg-rye,34,1,3,,,,18,1
+Rep 3,Change over 6 yrs,leg3x,Yes,Every winter,Leg-rye,94,21,12,,,,157,29
+Rep 3,Change over 6 yrs,mus1x,Yes,Every winter,Mustard,121,59,11,,,,53,20
+Rep 3,Change over 6 yrs,rye1x,Yes,Every winter,Rye,103,31,12,,,,57,6
+Rep 4,Change over 6 yrs,noccnocp,No,Every 4th winter,Leg-rye,-20,-10,0,,,,14,0
+Rep 4,Change over 6 yrs,nocc,Yes,Every 4th winter,Leg-rye,69,23,8,,,,72,13
+Rep 4,Change over 6 yrs,leg3x,Yes,Every winter,Leg-rye,86,10,11,,,,164,23
+Rep 4,Change over 6 yrs,mus1x,Yes,Every winter,Mustard,92,33,8,,,,168,32
+Rep 4,Change over 6 yrs,rye1x,Yes,Every winter,Rye,96,33,6,,,,11,11
+Rep 1,Time 0,noccnocp,No,Every 4th winter,Leg-rye,127,74,19,,,,106,12
+Rep 1,Time 0,nocc,Yes,Every 4th winter,Leg-rye,135,70,14,,,,48,5
+Rep 1,Time 0,leg3x,Yes,Every winter,Leg-rye,124,77,13,,,,70,6
+Rep 1,Time 0,mus1x,Yes,Every winter,Mustard,103,49,12,,,,47,5
+Rep 1,Time 0,rye1x,Yes,Every winter,Rye,152,69,14,,,,71,8
+Rep 2,Time 0,noccnocp,No,Every 4th winter,Leg-rye,121,56,17,,,,80,10
+Rep 2,Time 0,nocc,Yes,Every 4th winter,Leg-rye,149,82,20,,,,92,11
+Rep 2,Time 0,leg3x,Yes,Every winter,Leg-rye,101,37,13,,,,79,10
+Rep 2,Time 0,mus1x,Yes,Every winter,Mustard,115,53,9,,,,56,4
+Rep 2,Time 0,rye1x,Yes,Every winter,Rye,102,45,9,,,,51,5
+Rep 3,Time 0,noccnocp,No,Every 4th winter,Leg-rye,104,56,15,,,,118,12
+Rep 3,Time 0,nocc,Yes,Every 4th winter,Leg-rye,149,78,17,,,,101,12
+Rep 3,Time 0,leg3x,Yes,Every winter,Leg-rye,141,78,13,,,,93,11
+Rep 3,Time 0,mus1x,Yes,Every winter,Mustard,101,71,11,,,,112,10
+Rep 3,Time 0,rye1x,Yes,Every winter,Rye,140,52,16,,,,122,15
+Rep 4,Time 0,noccnocp,No,Every 4th winter,Leg-rye,121,69,14,,,,51,9
+Rep 4,Time 0,nocc,Yes,Every 4th winter,Leg-rye,122,75,18,,,,115,10
+Rep 4,Time 0,leg3x,Yes,Every winter,Leg-rye,155,70,19,,,,84,4
+Rep 4,Time 0,mus1x,Yes,Every winter,Mustard,121,70,20,,,,80,8
+Rep 4,Time 0,rye1x,Yes,Every winter,Rye,137,65,15,,,,123,14
+Rep 1,Time 6 years,noccnocp,No,Every 4th winter,Leg-rye,98,56,13,204,6,4,62,6
+Rep 1,Time 6 years,nocc,Yes,Every 4th winter,Leg-rye,175,80,22,302,12,8,95,10
+Rep 1,Time 6 years,leg3x,Yes,Every winter,Leg-rye,213,122,29,314,17,10,202,37
+Rep 1,Time 6 years,mus1x,Yes,Every winter,Mustard,154,118,26,298,12,7,158,19
+Rep 1,Time 6 years,rye1x,Yes,Every winter,Rye,167,88,23,193,11,8,220,28
+Rep 2,Time 6 years,noccnocp,No,Every 4th winter,Leg-rye,138,67,13,189,7,6,75,12
+Rep 2,Time 6 years,nocc,Yes,Every 4th winter,Leg-rye,170,71,21,304,10,5,112,15
+Rep 2,Time 6 years,leg3x,Yes,Every winter,Leg-rye,235,98,20,227,18,8,215,17
+Rep 2,Time 6 years,mus1x,Yes,Every winter,Rye,265,115,31,222,15,9,182,31
+Rep 2,Time 6 years,rye1x,No,Every 4th winter,Leg-rye,142,39,17,144,8,7,80,14
+Rep 3,Time 6 years,noccnocp,Yes,Every 4th winter,Leg-rye,182,78,19,200,9,6,120,14
+Rep 3,Time 6 years,nocc,Yes,Every winter,Leg-rye,234,99,24,248,12,8,249,39
+Rep 3,Time 6 years,leg3x,Yes,Every winter,Mustard,222,130,22,202,13,6,165,30
+Rep 3,Time 6 years,mus1x,Yes,Every winter,Rye,243,83,28,228,18,9,179,21
+Rep 3,Time 6 years,rye1x,No,Every 4th winter,Leg-rye,101,59,14,169,5,3,66,9
+Rep 4,Time 6 years,noccnocp,Yes,Every 4th winter,Leg-rye,191,98,26,239,12,7,187,22
+Rep 4,Time 6 years,nocc,Yes,Every winter,Leg-rye,241,80,30,252,10,7,248,27
+Rep 4,Time 6 years,leg3x,Yes,Every winter,Mustard,213,103,28,254,18,7,248,40
+Rep 4,Time 6 years,mus1x,Yes,Every winter,Rye,233,98,21,191,18,13,133,24
+Rep 4,Time 6 years ,rye1x,Yes,Every winter,Mustard,184,121,22,238,20,8,197,31
