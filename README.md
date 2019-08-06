@@ -716,9 +716,6 @@ our outcomes of interest
       )
     )
 
-    ## Warning in VSURF_pred.default(x = x, y = y, ntree = ntree, err.interp = interp$err.interp, : Unable to perform prediction step, because the interpretation step
-    ## did not eliminate variables
-
 Now we can look at each of these model results and see which variables
 are the most relevant. This Random Forest procedure generates lists of
 variables most suitable for both interpretatoin and prediction. Briefly,
@@ -1024,9 +1021,6 @@ model does.
         select(perc_sand:perc_clay, EC:`Fe (DTPA)`),
       parallel = TRUE
     )
-
-    ## Warning in VSURF_pred.default(x = x, y = y, ntree = ntree, err.interp = interp$err.interp, : Unable to perform prediction step, because the interpretation step
-    ## did not eliminate variables
 
     # Create data frame of resulting variables, also including clay
     resid.data <- data.frame(mgmt.model$residuals, all_data$perc_clay, all_data$`X-K`, all_data$`Ca (SP)`, all_data$`Mn (DTPA)`)
