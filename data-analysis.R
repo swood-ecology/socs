@@ -13,6 +13,9 @@ library(sjstats)
 library(stargazer)    # For generating HTML tables for export
 library(jtools)       # For effect plots
 
+source("fig4_function.R")
+
+
 # READ IN DATA
 usda_soil_data <- read_excel("data/usda-soil-data.xlsx") %>%
   mutate(
@@ -46,6 +49,7 @@ icp <- read_excel("data/icp.xlsx")
 
 
 # DATA MANIPULATION
+usda_soil_data$organic_matter <- usda_soil_data$organic_matter*0.58
 inputsLabels <- colnames(inputs)
 colnames(inputs)[4:18] <- c(
   "total_compost",
@@ -189,7 +193,7 @@ all_data %>%
     sd_WHC=sd(water_holding_capacity, na.rm=T),
     mean_SIR=mean(substrate_induced_respiration),
     sd_SIR=sd(substrate_induced_respiration)
-  ) %>%
+  ) %>% select(mean_om, sd_om) %>%
   write_excel_csv("tables/table1_filtered.csv")
 
 
@@ -545,10 +549,18 @@ names(resid.data) <- c('model_residuals','perc_clay','K','Ca','Mn')
 resid.model <- lm(model_residuals ~ perc_clay + K + Ca + Mn, data=resid.data)
 resid.model %>% summary()
 
-effect_plot(model=resid.model, pred = Ca, interval = TRUE, rug=TRUE, plot.points = TRUE,partial.residuals=TRUE)
-effect_plot(model=resid.model, pred = K, interval = TRUE, rug=TRUE, plot.points = TRUE,partial.residuals=TRUE)
-effect_plot(model=resid.model, pred = perc_clay, interval = TRUE, rug=TRUE, plot.points = TRUE,partial.residuals=TRUE)
-effect_plot(model=resid.model, pred = Mn, interval = TRUE, rug=TRUE, plot.points = TRUE,partial.residuals=TRUE)
+effect_plot(model=resid.model, pred = Ca, colors=all_data$System, 
+            shape=all_data$Replicate, 
+            x.label = "Calcium", y.label = "First-stage model residuals")
+effect_plot(model=resid.model, pred = K, colors=all_data$System, 
+            shape=all_data$Replicate, 
+            x.label = "Potassium", y.label = "First-stage model residuals")
+effect_plot(model=resid.model, pred = perc_clay, colors=all_data$System, 
+            shape=all_data$Replicate, 
+            x.label = "Percent clay", y.label = "First-stage model residuals")
+effect_plot(model=resid.model, pred = Mn, colors=all_data$System, 
+            shape=all_data$Replicate, 
+            x.label = "Manganese", y.label = "First-stage model residuals")
 
 stargazer(mgmt.model, resid.model, out="maom.htm")
 
