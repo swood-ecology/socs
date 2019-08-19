@@ -316,34 +316,28 @@ for(i in 1:length(rf.res)){
 }
 ```
 
-Some of these variables are highly correlated with each other so we'll
-select out the ones that we know to be somewhat independent and fit
-models with these.
+Let's fit these models. Note that some of these variables are highly correlated with each other so interpretation of the individual coefficients would be invalid for models with multiple predictor variables. Also, we will use OLS to estimates these models rather than ME because the random effects do not add any explanatory power, as you'll see with the example of the first model.
 
 ```{r}
 # Organic matter
-lm.om <- lmer(organic_matter ~ total_C_no_roots_no_exudates + (1 | Replicate), data = all_data)
+lm.om <- lmer(organic_matter ~ total_C_no_roots_no_exudates + total_om + total_cc_shoot + fresh_om_perc + (1|Replicate), data=all_data)
 summary(lm.om)
 r.squaredGLMM(lm.om)
-rm(lm.om)
+lm.om <- lm(organic_matter ~ total_C_no_roots_no_exudates + total_om + total_cc_shoot + fresh_om_perc, data=all_data)
+summary(lm.om)
+car::vif(lm.om)
 
 # Particulate
-lm.pc <- lmer(pom.stock ~ fresh_om + (1 | Replicate), data = all_data)
-summary(lm.pc)
-r.squaredGLMM(lm.pc)
-rm(lm.pc)
+lm.pom <- lm(pom.stock ~ fresh_om, data=all_data)
+summary(lm.pom)
 
 # Mineral
-lm.mc <- lmer(maom.stock ~ total_veg_residue_shoot + annual_legume_cc_shoot + (1 | Replicate), data = all_data)
-summary(lm.mc)
-r.squaredGLMM(lm.mc)
-rm(lm.mc)
+lm.maom <- lm(maom.stock ~ total_veg_residue_shoot + annual_legume_cc_shoot, data=all_data)
+summary(lm.maom)
 
 # SIR
-lm.sir <- lmer(substrate_induced_respiration ~ annual_cc_shoot + (1 | Replicate), data = all_data)
+lm.sir <- lm(substrate_induced_respiration ~ annual_cc_shoot, data=all_data)
 summary(lm.sir)
-r.squaredGLMM(lm.sir)
-rm(lm.sir)
 ```
 
 A surprising part of these models is how poorly the fixed effects
@@ -383,7 +377,7 @@ mgmt <- VSURF(
 )
 
 # Fit model with best management predictors
-mgmt.model <- lm(maom.stock ~ Compost + Cover_crop_freq + total_veg_residue_shoot, data = all_data)
+mgmt.model <- lm(maom.stock ~ Compost + Cover_crop_freq + total_veg_residue_shoot + annual_legume_cc_shoot, data = all_data)
 mgmt.model %>% summary()
 ```
 
@@ -404,7 +398,9 @@ soil.prop <- VSURF(
     select(perc_sand:perc_clay, EC:`Fe (DTPA)`),
   parallel = TRUE
 )
+```
 
+```{r}
 # Create data frame of resulting variables, also including clay
 resid.data <- data.frame(mgmt.model$residuals, all_data$perc_clay, all_data$`X-K`, all_data$`Ca (SP)`, all_data$`Mn (DTPA)`)
 names(resid.data) <- c("model_residuals", "perc_clay", "K", "Ca", "Mn")
@@ -412,15 +408,15 @@ names(resid.data) <- c("model_residuals", "perc_clay", "K", "Ca", "Mn")
 resid.model <- lm(model_residuals ~ perc_clay + K + Ca + Mn, data = resid.data)
 resid.model %>% summary()
 
-effect_plot(model = resid.model, pred = Ca, interval = TRUE, rug = TRUE, plot.points = TRUE, partial.residuals = TRUE)
+jtools::effect_plot(model = resid.model, pred = Ca, interval = TRUE, rug = TRUE, plot.points = TRUE, partial.residuals = TRUE)
 
-effect_plot(model = resid.model, pred = K, interval = TRUE, rug = TRUE, plot.points = TRUE, partial.residuals = TRUE)
+jtools::effect_plot(model = resid.model, pred = K, interval = TRUE, rug = TRUE, plot.points = TRUE, partial.residuals = TRUE)
 
-effect_plot(model = resid.model, pred = perc_clay, interval = TRUE, rug = TRUE, plot.points = TRUE, partial.residuals = TRUE)
+jtools::effect_plot(model = resid.model, pred = perc_clay, interval = TRUE, rug = TRUE, plot.points = TRUE, partial.residuals = TRUE)
 
-effect_plot(model = resid.model, pred = Mn, interval = TRUE, rug = TRUE, plot.points = TRUE, partial.residuals = TRUE)
+jtools::effect_plot(model = resid.model, pred = Mn, interval = TRUE, rug = TRUE, plot.points = TRUE, partial.residuals = TRUE)
 ```
     
-The adjusted R2 of this model is over 0.4! That's a huge improvement
+The adjusted R2 of this model is 0.3! That's a big improvement
 over the management model, which was barely predicting 10% of the
 variation.

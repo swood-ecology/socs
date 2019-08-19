@@ -716,9 +716,6 @@ our outcomes of interest
       )
     )
 
-    ## Warning in VSURF_pred.default(x = x, y = y, ntree = ntree, err.interp = interp$err.interp, : Unable to perform prediction step, because the interpretation step
-    ## did not eliminate variables
-
 Now we can look at each of these model results and see which variables
 are the most relevant. This Random Forest procedure generates lists of
 variables most suitable for both interpretatoin and prediction. Briefly,
@@ -737,10 +734,10 @@ identified for interpretation.
     }
 
     ## all_data$organic_matter
-    ## [1] "total_C_no_roots_no_exudates" "total_om"                    
-    ## [3] "fresh_om"                     "total_cc_shoot"              
-    ## [5] "fresh_om_perc"                "total_compost"               
-    ## [7] "compost_n"                   
+    ## [1] "total_C_no_roots_no_exudates" "fresh_om"                    
+    ## [3] "total_om"                     "total_cc_shoot"              
+    ## [5] "fresh_om_perc"                "compost_n"                   
+    ## [7] "total_compost"               
     ## all_data$pom.stock
     ## [1] "fresh_om"
     ## all_data$maom.stock
@@ -748,12 +745,15 @@ identified for interpretation.
     ## all_data$substrate_induced_respiration
     ## [1] "annual_cc_shoot"
 
-Some of these variables are highly correlated with each other so we'll
-select out the ones that we know to be somewhat independent and fit
-models with these.
+Let's fit these models. Note that some of these variables are highly
+correlated with each other so interpretation of the individual
+coefficients would be invalid for models with multiple predictor
+variables. Also, we will use OLS to estimates these models rather than
+ME because the random effects do not add any explanatory power, as
+you'll see with the example of the first model.
 
     # Organic matter
-    lm.om <- lmer(organic_matter ~ total_C_no_roots_no_exudates + (1 | Replicate), data = all_data)
+    lm.om <- lmer(organic_matter ~ total_C_no_roots_no_exudates + total_om + total_cc_shoot + fresh_om_perc + (1|Replicate), data=all_data)
 
     ## Warning: Some predictor variables are on very different scales: consider
     ## rescaling
@@ -767,34 +767,43 @@ models with these.
 
     ## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
     ## lmerModLmerTest]
-    ## Formula: organic_matter ~ total_C_no_roots_no_exudates + (1 | Replicate)
+    ## Formula: 
+    ## organic_matter ~ total_C_no_roots_no_exudates + total_om + total_cc_shoot +  
+    ##     fresh_om_perc + (1 | Replicate)
     ##    Data: all_data
     ## 
-    ## REML criterion at convergence: 28.2
+    ## REML criterion at convergence: 66.7
     ## 
     ## Scaled residuals: 
-    ##      Min       1Q   Median       3Q      Max 
-    ## -1.79229 -0.73045  0.04049  0.63798  1.88992 
+    ##     Min      1Q  Median      3Q     Max 
+    ## -1.8017 -0.4213  0.0276  0.4585  1.7819 
     ## 
     ## Random effects:
-    ##  Groups    Name        Variance Std.Dev.
-    ##  Replicate (Intercept) 0.00000  0.0000  
-    ##  Residual              0.06617  0.2572  
+    ##  Groups    Name        Variance  Std.Dev. 
+    ##  Replicate (Intercept) 1.960e-13 4.428e-07
+    ##  Residual              7.405e-02 2.721e-01
     ## Number of obs: 20, groups:  Replicate, 4
     ## 
     ## Fixed effects:
-    ##                               Estimate Std. Error        df t value
-    ## (Intercept)                  1.773e+00  1.931e-01 1.800e+01   9.181
-    ## total_C_no_roots_no_exudates 1.738e-05  2.608e-06 1.800e+01   6.663
-    ##                              Pr(>|t|)    
-    ## (Intercept)                  3.27e-08 ***
-    ## total_C_no_roots_no_exudates 2.98e-06 ***
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ##                                Estimate Std. Error         df t value
+    ## (Intercept)                   7.7005669  5.6933037 15.0000000   1.353
+    ## total_C_no_roots_no_exudates -0.0024029  0.0028985 15.0000000  -0.829
+    ## total_om                      0.0008399  0.0010200 15.0000000   0.823
+    ## total_cc_shoot                0.0001935  0.0002106 15.0000000   0.919
+    ## fresh_om_perc                 0.1267740  0.1806852 15.0000000   0.702
+    ##                              Pr(>|t|)
+    ## (Intercept)                     0.196
+    ## total_C_no_roots_no_exudates    0.420
+    ## total_om                        0.423
+    ## total_cc_shoot                  0.373
+    ## fresh_om_perc                   0.494
     ## 
     ## Correlation of Fixed Effects:
-    ##             (Intr)
-    ## ttl_C_n_r__ -0.955
+    ##             (Intr) t_C___ totl_m ttl_c_
+    ## ttl_C_n_r__ -0.709                     
+    ## total_om     0.696 -1.000              
+    ## totl_cc_sht  0.805 -0.989  0.986       
+    ## fresh_m_prc  0.565 -0.983  0.986  0.944
     ## fit warnings:
     ## Some predictor variables are on very different scales: consider rescaling
     ## convergence code: 0
@@ -803,149 +812,110 @@ models with these.
     r.squaredGLMM(lm.om)
 
     ##            R2m       R2c
-    ## [1,] 0.7002862 0.7002862
+    ## [1,] 0.6820519 0.6820519
 
-    rm(lm.om)
+    lm.om <- lm(organic_matter ~ total_C_no_roots_no_exudates + total_om + total_cc_shoot + fresh_om_perc, data=all_data)
+    summary(lm.om)
+
+    ## 
+    ## Call:
+    ## lm(formula = organic_matter ~ total_C_no_roots_no_exudates + 
+    ##     total_om + total_cc_shoot + fresh_om_perc, data = all_data)
+    ## 
+    ## Residuals:
+    ##      Min       1Q   Median       3Q      Max 
+    ## -0.49027 -0.11465  0.00751  0.12476  0.48488 
+    ## 
+    ## Coefficients:
+    ##                                Estimate Std. Error t value Pr(>|t|)
+    ## (Intercept)                   7.7005669  5.6933037   1.353    0.196
+    ## total_C_no_roots_no_exudates -0.0024029  0.0028985  -0.829    0.420
+    ## total_om                      0.0008399  0.0010200   0.823    0.423
+    ## total_cc_shoot                0.0001935  0.0002106   0.919    0.373
+    ## fresh_om_perc                 0.1267740  0.1806852   0.702    0.494
+    ## 
+    ## Residual standard error: 0.2721 on 15 degrees of freedom
+    ## Multiple R-squared:  0.731,  Adjusted R-squared:  0.6592 
+    ## F-statistic: 10.19 on 4 and 15 DF,  p-value: 0.0003428
+
+    car::vif(lm.om)
+
+    ## total_C_no_roots_no_exudates                     total_om 
+    ##                  1111360.827                  1110053.864 
+    ##               total_cc_shoot                fresh_om_perc 
+    ##                     4813.807                     4456.391
 
     # Particulate
-    lm.pc <- lmer(pom.stock ~ fresh_om + (1 | Replicate), data = all_data)
+    lm.pom <- lm(pom.stock ~ fresh_om, data=all_data)
+    summary(lm.pom)
 
-    ## Warning: Some predictor variables are on very different scales: consider
-    ## rescaling
-
-    ## boundary (singular) fit: see ?isSingular
-
-    ## Warning: Some predictor variables are on very different scales: consider
-    ## rescaling
-
-    summary(lm.pc)
-
-    ## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
-    ## lmerModLmerTest]
-    ## Formula: pom.stock ~ fresh_om + (1 | Replicate)
-    ##    Data: all_data
     ## 
-    ## REML criterion at convergence: 87.3
+    ## Call:
+    ## lm(formula = pom.stock ~ fresh_om, data = all_data)
     ## 
-    ## Scaled residuals: 
+    ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -1.6891 -0.6511 -0.1953  0.6046  2.1321 
+    ## -2.2337 -0.8611 -0.2583  0.7995  2.8196 
     ## 
-    ## Random effects:
-    ##  Groups    Name        Variance Std.Dev.
-    ##  Replicate (Intercept) 0.000    0.000   
-    ##  Residual              1.749    1.322   
-    ## Number of obs: 20, groups:  Replicate, 4
-    ## 
-    ## Fixed effects:
-    ##               Estimate Std. Error         df t value Pr(>|t|)    
-    ## (Intercept) -4.528e-01  1.167e+00  1.800e+01  -0.388 0.702507    
-    ## fresh_om     5.561e-05  1.265e-05  1.800e+01   4.396 0.000348 ***
+    ## Coefficients:
+    ##               Estimate Std. Error t value Pr(>|t|)    
+    ## (Intercept) -4.528e-01  1.167e+00  -0.388 0.702507    
+    ## fresh_om     5.561e-05  1.265e-05   4.396 0.000348 ***
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Correlation of Fixed Effects:
-    ##          (Intr)
-    ## fresh_om -0.967
-    ## fit warnings:
-    ## Some predictor variables are on very different scales: consider rescaling
-    ## convergence code: 0
-    ## boundary (singular) fit: see ?isSingular
-
-    r.squaredGLMM(lm.pc)
-
-    ##            R2m       R2c
-    ## [1,] 0.5042523 0.5042523
-
-    rm(lm.pc)
+    ## Residual standard error: 1.322 on 18 degrees of freedom
+    ## Multiple R-squared:  0.5178, Adjusted R-squared:  0.491 
+    ## F-statistic: 19.33 on 1 and 18 DF,  p-value: 0.0003484
 
     # Mineral
-    lm.mc <- lmer(maom.stock ~ total_veg_residue_shoot + annual_legume_cc_shoot + (1 | Replicate), data = all_data)
+    lm.maom <- lm(maom.stock ~ total_veg_residue_shoot + annual_legume_cc_shoot, data=all_data)
+    summary(lm.maom)
 
-    ## Warning: Some predictor variables are on very different scales: consider
-    ## rescaling
-
-    ## Warning: Some predictor variables are on very different scales: consider
-    ## rescaling
-
-    summary(lm.mc)
-
-    ## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
-    ## lmerModLmerTest]
-    ## Formula: maom.stock ~ total_veg_residue_shoot + annual_legume_cc_shoot +  
-    ##     (1 | Replicate)
-    ##    Data: all_data
     ## 
-    ## REML criterion at convergence: 182.7
+    ## Call:
+    ## lm(formula = maom.stock ~ total_veg_residue_shoot + annual_legume_cc_shoot, 
+    ##     data = all_data)
     ## 
-    ## Scaled residuals: 
-    ##      Min       1Q   Median       3Q      Max 
-    ## -1.60560 -0.27920 -0.01373  0.29544  2.01977 
-    ## 
-    ## Random effects:
-    ##  Groups    Name        Variance Std.Dev.
-    ##  Replicate (Intercept) 1990.2   44.61   
-    ##  Residual               123.5   11.11   
-    ## Number of obs: 20, groups:  Replicate, 4
-    ## 
-    ## Fixed effects:
-    ##                          Estimate Std. Error        df t value Pr(>|t|)
-    ## (Intercept)             5.023e+01  4.531e+01 1.644e+01   1.108    0.284
-    ## total_veg_residue_shoot 9.887e-05  7.364e-04 1.405e+01   0.134    0.895
-    ## annual_legume_cc_shoot  3.849e-04  2.397e-03 1.401e+01   0.161    0.875
-    ## 
-    ## Correlation of Fixed Effects:
-    ##             (Intr) ttl___
-    ## ttl_vg_rsd_ -0.866       
-    ## annl_lgm_c_ -0.467  0.472
-    ## fit warnings:
-    ## Some predictor variables are on very different scales: consider rescaling
-
-    r.squaredGLMM(lm.mc)
-
-    ##               R2m       R2c
-    ## [1,] 0.0001041067 0.9415994
-
-    rm(lm.mc)
-
-    # SIR
-    lm.sir <- lmer(substrate_induced_respiration ~ annual_cc_shoot + (1 | Replicate), data = all_data)
-    summary(lm.sir)
-
-    ## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
-    ## lmerModLmerTest]
-    ## Formula: substrate_induced_respiration ~ annual_cc_shoot + (1 | Replicate)
-    ##    Data: all_data
-    ## 
-    ## REML criterion at convergence: 111.1
-    ## 
-    ## Scaled residuals: 
+    ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -1.8243 -0.6817  0.1658  0.6018  1.3704 
+    ## -58.510 -32.182  -3.622  32.128  75.270 
     ## 
-    ## Random effects:
-    ##  Groups    Name        Variance Std.Dev.
-    ##  Replicate (Intercept) 0.2366   0.4865  
-    ##  Residual              9.2802   3.0463  
-    ## Number of obs: 20, groups:  Replicate, 4
-    ## 
-    ## Fixed effects:
-    ##                  Estimate Std. Error        df t value Pr(>|t|)   
-    ## (Intercept)     1.810e+01  5.520e+00 1.766e+01   3.280  0.00424 **
-    ## annual_cc_shoot 4.731e-04  7.866e-04 1.743e+01   0.601  0.55527   
+    ## Coefficients:
+    ##                           Estimate Std. Error t value Pr(>|t|)  
+    ## (Intercept)             244.979994 134.449768   1.822   0.0861 .
+    ## total_veg_residue_shoot  -0.003514   0.002513  -1.398   0.1800  
+    ## annual_legume_cc_shoot   -0.006726   0.008588  -0.783   0.4443  
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Correlation of Fixed Effects:
-    ##             (Intr)
-    ## annl_cc_sht -0.991
+    ## Residual standard error: 40.86 on 17 degrees of freedom
+    ## Multiple R-squared:  0.1051, Adjusted R-squared:  -0.000196 
+    ## F-statistic: 0.9981 on 2 and 17 DF,  p-value: 0.3892
 
-    r.squaredGLMM(lm.sir)
+    # SIR
+    lm.sir <- lm(substrate_induced_respiration ~ annual_cc_shoot, data=all_data)
+    summary(lm.sir)
 
-    ##             R2m        R2c
-    ## [1,] 0.01844617 0.04285375
-
-    rm(lm.sir)
+    ## 
+    ## Call:
+    ## lm(formula = substrate_induced_respiration ~ annual_cc_shoot, 
+    ##     data = all_data)
+    ## 
+    ## Residuals:
+    ##     Min      1Q  Median      3Q     Max 
+    ## -5.6209 -2.1315  0.5242  1.9546  4.3966 
+    ## 
+    ## Coefficients:
+    ##                  Estimate Std. Error t value Pr(>|t|)   
+    ## (Intercept)     1.793e+01  5.538e+00   3.238  0.00457 **
+    ## annual_cc_shoot 4.983e-04  7.899e-04   0.631  0.53606   
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Residual standard error: 3.077 on 18 degrees of freedom
+    ## Multiple R-squared:  0.02163,    Adjusted R-squared:  -0.03272 
+    ## F-statistic: 0.398 on 1 and 18 DF,  p-value: 0.5361
 
 A surprising part of these models is how poorly the fixed effects
 predict mineral-associated C, while how well the random effects do. This
@@ -983,30 +953,31 @@ were capturing with new fixed effects.
     )
 
     # Fit model with best management predictors
-    mgmt.model <- lm(maom.stock ~ Compost + Cover_crop_freq + total_veg_residue_shoot, data = all_data)
+    mgmt.model <- lm(maom.stock ~ Compost + Cover_crop_freq + total_veg_residue_shoot + annual_legume_cc_shoot, data = all_data)
     mgmt.model %>% summary()
 
     ## 
     ## Call:
-    ## lm(formula = maom.stock ~ Compost + Cover_crop_freq + total_veg_residue_shoot, 
-    ##     data = all_data)
+    ## lm(formula = maom.stock ~ Compost + Cover_crop_freq + total_veg_residue_shoot + 
+    ##     annual_legume_cc_shoot, data = all_data)
     ## 
     ## Residuals:
     ##    Min     1Q Median     3Q    Max 
-    ## -49.17 -25.20 -14.44  26.13  60.60 
+    ## -51.85 -23.74 -12.07  28.28  52.98 
     ## 
     ## Coefficients:
     ##                                   Estimate Std. Error t value Pr(>|t|)  
-    ## (Intercept)                     442.545423 178.726290   2.476   0.0248 *
-    ## CompostYes                       34.967715  29.326072   1.192   0.2505  
-    ## Cover_crop_freqEvery 4th Winter -32.110372  27.566440  -1.165   0.2612  
-    ## total_veg_residue_shoot          -0.007857   0.003486  -2.254   0.0386 *
+    ## (Intercept)                     484.310771 194.303496   2.493   0.0249 *
+    ## CompostYes                       36.995138  30.084755   1.230   0.2378  
+    ## Cover_crop_freqEvery 4th Winter -51.691733  42.270493  -1.223   0.2402  
+    ## total_veg_residue_shoot          -0.008771   0.003849  -2.279   0.0377 *
+    ## annual_legume_cc_shoot            0.007994   0.012888   0.620   0.5444  
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 38.64 on 16 degrees of freedom
-    ## Multiple R-squared:  0.2468, Adjusted R-squared:  0.1056 
-    ## F-statistic: 1.748 on 3 and 16 DF,  p-value: 0.1976
+    ## Residual standard error: 39.41 on 15 degrees of freedom
+    ## Multiple R-squared:  0.2657, Adjusted R-squared:  0.06986 
+    ## F-statistic: 1.357 on 4 and 15 DF,  p-value: 0.2953
 
 Now that we have our management model, we can use a Random Forest
 approach to identify the variables related to the residuals of the
@@ -1041,38 +1012,37 @@ model does.
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -44.518 -14.003   7.291  18.947  29.011 
+    ## -50.686 -14.158   8.911  20.334  27.072 
     ## 
     ## Coefficients:
-    ##             Estimate Std. Error t value Pr(>|t|)   
-    ## (Intercept)  -1.2515    85.9788  -0.015  0.98858   
-    ## perc_clay     0.2174     3.1264   0.070  0.94548   
-    ## K            -0.3872     0.1136  -3.409  0.00389 **
-    ## Ca           20.4718     5.9750   3.426  0.00375 **
-    ## Mn           -1.1775     1.0419  -1.130  0.27615   
+    ##             Estimate Std. Error t value Pr(>|t|)  
+    ## (Intercept)   3.1505    93.0671   0.034   0.9734  
+    ## perc_clay    -0.3419     3.3842  -0.101   0.9209  
+    ## K            -0.3460     0.1229  -2.814   0.0131 *
+    ## Ca           18.2203     6.4676   2.817   0.0130 *
+    ## Mn           -1.0171     1.1278  -0.902   0.3814  
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 26.95 on 15 degrees of freedom
-    ## Multiple R-squared:  0.5442, Adjusted R-squared:  0.4226 
-    ## F-statistic: 4.477 on 4 and 15 DF,  p-value: 0.01403
+    ## Residual standard error: 29.17 on 15 degrees of freedom
+    ## Multiple R-squared:  0.4522, Adjusted R-squared:  0.3061 
+    ## F-statistic: 3.096 on 4 and 15 DF,  p-value: 0.04811
 
-    effect_plot(model = resid.model, pred = Ca, interval = TRUE, rug = TRUE, plot.points = TRUE, partial.residuals = TRUE)
+    jtools::effect_plot(model = resid.model, pred = Ca, interval = TRUE, rug = TRUE, plot.points = TRUE, partial.residuals = TRUE)
 
-![](data-analysis_files/figure-markdown_strict/unnamed-chunk-10-1.png)
+![](data-analysis_files/figure-markdown_strict/unnamed-chunk-11-1.png)
 
-    effect_plot(model = resid.model, pred = K, interval = TRUE, rug = TRUE, plot.points = TRUE, partial.residuals = TRUE)
+    jtools::effect_plot(model = resid.model, pred = K, interval = TRUE, rug = TRUE, plot.points = TRUE, partial.residuals = TRUE)
 
-![](data-analysis_files/figure-markdown_strict/unnamed-chunk-10-2.png)
+![](data-analysis_files/figure-markdown_strict/unnamed-chunk-11-2.png)
 
-    effect_plot(model = resid.model, pred = perc_clay, interval = TRUE, rug = TRUE, plot.points = TRUE, partial.residuals = TRUE)
+    jtools::effect_plot(model = resid.model, pred = perc_clay, interval = TRUE, rug = TRUE, plot.points = TRUE, partial.residuals = TRUE)
 
-![](data-analysis_files/figure-markdown_strict/unnamed-chunk-10-3.png)
+![](data-analysis_files/figure-markdown_strict/unnamed-chunk-11-3.png)
 
-    effect_plot(model = resid.model, pred = Mn, interval = TRUE, rug = TRUE, plot.points = TRUE, partial.residuals = TRUE)
+    jtools::effect_plot(model = resid.model, pred = Mn, interval = TRUE, rug = TRUE, plot.points = TRUE, partial.residuals = TRUE)
 
-![](data-analysis_files/figure-markdown_strict/unnamed-chunk-10-4.png)
+![](data-analysis_files/figure-markdown_strict/unnamed-chunk-11-4.png)
 
-The adjusted R2 of this model is over 0.4! That's a huge improvement
-over the management model, which was barely predicting 10% of the
-variation.
+The adjusted R2 of this model is 0.3! That's a big improvement over the
+management model, which was barely predicting 10% of the variation.
