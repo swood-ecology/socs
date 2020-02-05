@@ -12,6 +12,7 @@ library(MuMIn)
 library(sjstats)
 library(stargazer)    # For generating HTML tables for export
 library(jtools)       # For interaction plots
+library(simr)         # For power analysis
 source("fig4_function.R")
 
 
@@ -143,9 +144,7 @@ all_data %>%
     mean_MAOMCN=mean(`MAOM_CN`),
     sd_MAOMCN=sd(`MAOM_CN`),
     mean_WHC=mean(water_holding_capacity, na.rm=T),
-    sd_WHC=sd(water_holding_capacity, na.rm=T),
-    mean_SIR=mean(substrate_induced_respiration),
-    sd_SIR=sd(substrate_induced_respiration)
+    sd_WHC=sd(water_holding_capacity, na.rm=T)
   ) %>%
   write_excel_csv("tables/table1.csv")
 
@@ -189,15 +188,13 @@ all_data %>%
     mean_MAOMCN=mean(`MAOM_CN`),
     sd_MAOMCN=sd(`MAOM_CN`),
     mean_WHC=mean(water_holding_capacity, na.rm=T),
-    sd_WHC=sd(water_holding_capacity, na.rm=T),
-    mean_SIR=mean(substrate_induced_respiration),
-    sd_SIR=sd(substrate_induced_respiration)
+    sd_WHC=sd(water_holding_capacity, na.rm=T)
   ) %>% select(mean_om, sd_om) %>%
   write_excel_csv("tables/table1_filtered.csv")
 
 
 ## Fig. 1. Cumulative inputs
-input.colors <- c("#fff7bc","#662506")
+input.colors <- c("#e6b020","#611C16")
 
 all_data %>%
   select(System, Compost, 
@@ -217,8 +214,8 @@ ggplot(fig1.data, aes(x=System,y=value,fill=Compost)) +
   scale_fill_manual(values=input.colors) +
   geom_errorbar(data=error, mapping = aes(
     x = System,
-    ymin = value.mean - value.se,
-    ymax = value.mean + value.se  
+    ymin = value.mean - value.se*3.18,
+    ymax = value.mean + value.se*3.18  
   ), width = .25,
   position = position_dodge(0.9, preserve = "single"),
   inherit.aes = FALSE) +
@@ -235,7 +232,9 @@ ggplot(fig1.data, aes(x=System,y=value,fill=Compost)) +
     strip.background = element_blank(),
     strip.text = element_text(color="black"),
     strip.placement = "outside",
-    axis.text.x = element_text(size=8,angle=90)
+    axis.title.y = element_text(size=13),
+    axis.text.y = element_text(size=11),
+    axis.text.x = element_text(size=12,angle=90)
   ) -> fig1
 
 # Get gtable object
@@ -245,7 +244,7 @@ g <- gtable::gtable_add_rows(x = g, heights = unit(0.65, 'cm'), pos = 2)
 # First strip
 g <- gtable::gtable_add_grob(x = g,
                      grobs = list(rectGrob(gp = gpar(col = NA, 
-                                                     fill = "grey70")),
+                                                     fill = "grey30")),
                                   textGrob(label = "Carbon", 
                                            gp = gpar(col = "white"))),
                      t = 3, l = 7, b = 3, r = 7, 
@@ -253,7 +252,7 @@ g <- gtable::gtable_add_grob(x = g,
 # Second strip
 g <- gtable::gtable_add_grob(x = g,
                      grobs = list(rectGrob(gp = gpar(col = NA, 
-                                                     fill = "grey70")),
+                                                     fill = "grey30")),
                                   textGrob(label = "Nitrogen", 
                                            gp = gpar(col = "white"))),
                      t = 3, l = 13, b = 3, r = 13, 
@@ -261,7 +260,7 @@ g <- gtable::gtable_add_grob(x = g,
 # Third strip
 g <- gtable::gtable_add_grob(x = g,
                              grobs = list(rectGrob(gp = gpar(col = NA, 
-                                                             fill = "grey70")),
+                                                             fill = "grey30")),
                                           textGrob(label = "Organic matter", 
                                                    gp = gpar(col = "white"))),
                              t = 3, l = 19, b = 3, r = 19, 
@@ -313,35 +312,65 @@ lmer(maom.n.stock ~ Compost + Cover_crop_freq + (1|Replicate),
 summary(maom.n.model)
 r.squaredGLMM(maom.n.model)
 
-all_data %>%
-  select(
-    Replicate, cover_crop, Compost, Cover_crop_freq, organic_matter, water_holding_capacity,
-    substrate_induced_respiration:POM_CN, `POM C`, `MAOM C`, slope, pom.stock, pom.n.stock, maom.stock, maom.n.stock, 
-    total_C_no_roots_no_exudates, CEC, pH, `X-Ca`
-  ) -> fig2model.sir
-
-lmer(substrate_induced_respiration ~ cover_crop + Compost + Cover_crop_freq + (1|Replicate),
-     data = fig2model.sir
-) -> sir.model
-summary(sir.model)
-r.squaredGLMM(sir.model)
-
-lmer(substrate_induced_respiration ~ cover_crop + Compost + Cover_crop_freq + pom.n.stock + (1|Replicate),
-     data = fig2model.sir
-) -> sir.model.cn
-car::vif(sir.model.cn)
-summary(sir.model.cn)
-r.squaredGLMM(sir.model.cn)
-
 class(om.model) <- "lmerMod"
 class(pom.model) <- "lmerMod"
 class(pom.n.model) <- "lmerMod"
 class(maom.model) <- "lmerMod"
 class(maom.n.model) <- "lmerMod"
-class(sir.model) <- "lmerMod"
-class(sir.model.cn) <- "lmerMod"
 
-stargazer(om.model, maom.model, maom.n.model, pom.model, pom.n.model, sir.model, sir.model.cn, out="regression.htm")
+stargazer(om.model, maom.model, maom.n.model, pom.model, pom.n.model, out="regression.htm")
+
+#####POWER ANALYSIS#####
+fig2model %>%
+  select(Replicate:organic_matter,pom.stock,maom.stock) %>%
+  mutate(Rep = case_when(Replicate=='Rep 1' ~ 1,
+                         Replicate=='Rep 2' ~ 2,
+                         Replicate=='Rep 3' ~ 3,
+                         Replicate=='Rep 4' ~ 4
+  )) %>%
+  fastDummies::dummy_cols() -> power.data
+
+lmer(organic_matter ~ Cover_crop_freq_Annually + Compost_Yes + (1|Rep),
+     data = power.data
+) -> model1
+model2 <- extend(model1,along='Rep',n=15)
+pC1 <- powerCurve(model2,along='Rep')
+plot(pC1)
+
+lmer(organic_matter ~ Compost_Yes + Cover_crop_freq_Annually + (1|Rep),
+     data = power.data
+) -> model3
+model4 <- extend(model3,along='Rep',n=15)
+pC2 <- powerCurve(model4,along='Rep')
+plot(pC2)
+
+lmer(maom.stock ~ Cover_crop_freq_Annually + Compost_Yes + (1|Rep),
+     data = power.data
+) -> model5
+model6 <- extend(model5,along='Rep',n=15)
+pC3 <- powerCurve(model6,along='Rep')
+plot(pC3)
+
+lmer(maom.stock ~ Compost_Yes + Cover_crop_freq_Annually + (1|Rep),
+     data = power.data
+) -> model7
+model8 <- extend(model7,along='Rep',n=15)
+pC4 <- powerCurve(model8,along='Rep')
+plot(pC4)
+
+lmer(pom.stock ~ Cover_crop_freq_Annually + Compost_Yes + (1|Rep),
+     data = power.data
+) -> model9
+model10 <- extend(model9,along='Rep',n=15)
+pC5 <- powerCurve(model10,along='Rep')
+plot(pC5)
+
+lmer(pom.stock ~ Compost_Yes + Cover_crop_freq_Annually +  (1|Rep),
+     data = power.data
+) -> model11
+model12 <- extend(model11,along='Rep',n=15)
+pC6 <- powerCurve(model12,along='Rep')
+plot(pC6)
 
 
 ## Fig. 4 MAOM by soil properties
@@ -354,8 +383,12 @@ mgmt <- VSURF(
 )
 
 # Fit model with best management predictors
-mgmt.model <- lm(maom.stock ~ Compost+Cover_crop_freq+total_veg_residue_shoot + annual_legume_cc_shoot, data=all_data)
+mgmt.model <- lm(maom.stock ~ Compost + Cover_crop_freq + total_veg_residue_shoot + annual_legume_cc_shoot, data=all_data)
 mgmt.model %>% summary()
+
+ca.model <- lm(`Ca (SP)`~ Compost, data=all_data)
+k.model <- lm(`X-K...19`~ Compost, data=all_data)
+mn.model <- lm(`Mn (DTPA)`~ Compost, data=all_data)
 
 # Find best non-management predictors of model residuals
 soil.prop <- VSURF(
@@ -366,653 +399,31 @@ soil.prop <- VSURF(
 )
 
 # Create data frame of resulting variables, also including clay
-resid.data <- data.frame(mgmt.model$residuals,all_data$perc_clay,all_data$`X-K`,all_data$`Ca (SP)`,all_data$`Mn (DTPA)`)
-names(resid.data) <- c('model_residuals','perc_clay','K','Ca','Mn')
+resid.data <- data.frame(mgmt.model$residuals,all_data$perc_clay,all_data$`X-K...19`,all_data$`Ca (SP)`,all_data$`Mn (DTPA)`,all_data$`Na (SP)`)
+names(resid.data) <- c('model_residuals','perc_clay','K','Ca','Mn','Na')
 
 resid.model <- lm(model_residuals ~ perc_clay + K + Ca + Mn, data=resid.data)
 resid.model %>% summary()
 
-effect_plot(model=resid.model, pred = Ca, colors=all_data$System, 
+resid.data.all <- data.frame(mgmt.model$residuals,ca.model$residuals,all_data$perc_clay,k.model$residuals,mn.model$residuals)
+names(resid.data.all) <- c('model_residuals','Ca','perc_clay','K','Mn')
+
+resid.model.ca <- lm(model_residuals ~ perc_clay + Ca +K +Mn, data=resid.data.all)
+resid.model.ca %>% summary()
+
+
+effect_plot(model=resid.model.ca, pred = Ca, colors=all_data$System, 
             shape=all_data$Replicate, 
             x.label = "Calcium", y.label = "First-stage model residuals")
-effect_plot(model=resid.model, pred = K, colors=all_data$System, 
+effect_plot(model=resid.model.ca, pred = K, colors=all_data$System, 
             shape=all_data$Replicate, 
             x.label = "Potassium", y.label = "First-stage model residuals")
-effect_plot(model=resid.model, pred = perc_clay, colors=all_data$System, 
+effect_plot(model=resid.model.ca, pred = perc_clay, colors=all_data$System, 
             shape=all_data$Replicate, 
             x.label = "Percent clay", y.label = "First-stage model residuals")
-effect_plot(model=resid.model, pred = Mn, colors=all_data$System, 
+effect_plot(model=resid.model.ca, pred = Mn, colors=all_data$System, 
             shape=all_data$Replicate, 
             x.label = "Manganese", y.label = "First-stage model residuals")
 
-stargazer(mgmt.model, resid.model, out="maom.htm")
-
-# Fig. 5 Soil properties by quantitative inputs
-## Random forest models of quantitative predictors
-rf.res <- list(
-  VSURF(
-    y = all_data$organic_matter,
-    x = all_data %>%
-      select(total_compost:total_C_no_roots_no_exudates),
-    parallel = TRUE
-  ), # total_C_no_roots_no_exudates, fresh_om, total_om, total_cc_shoot, fresh_om_perc, total_compost
-  VSURF(
-    y = all_data$pom.stock,
-    x = all_data %>%
-      select(total_compost:total_C_no_roots_no_exudates),
-    parallel = TRUE
-  ), # fresh_om
-  VSURF(
-    y = all_data$maom.stock,
-    x = all_data %>%
-      select(total_compost:total_C_no_roots_no_exudates),
-    parallel = TRUE
-  ), # total_veg_residue_shoot, annual_legume_cc_shoot
-  VSURF(
-    y = all_data$substrate_induced_respiration,
-    x = all_data %>%
-      select(total_compost:total_C_no_roots_no_exudates),
-    parallel = TRUE
-  ) # annual_cc_shoot
-)
-
-### organic_matter
-# total_C_no_roots_no_exudates, total_cc_shoot, fresh_om_perc, total_compost
-lm.om <- lmer(organic_matter ~ total_C_no_roots_no_exudates + total_om + total_cc_shoot + fresh_om_perc + (1|Replicate), data=all_data)
-summary(lm.om)
-r.squaredGLMM(lm.om)
-lm.om <- lm(organic_matter ~ total_C_no_roots_no_exudates + total_om + total_cc_shoot + fresh_om_perc, data=all_data)
-summary(lm.om)
-
-### pom.stock x fresh_om
-lm.pom <- lmer(pom.stock ~ fresh_om + (1|Replicate), data=all_data)
-summary(lm.pom)
-r.squaredGLMM(lm.pom)
-lm.pom <- lm(pom.stock ~ fresh_om, data=all_data)
-summary(lm.pom)
-
-### maom.stock 
-# total_veg_residue_shoot, annual_legume_cc_shoot
-lm.maom <- lmer(maom.stock ~ total_veg_residue_shoot + annual_legume_cc_shoot + (1|Replicate), data=all_data)
-r.squaredGLMM(lm.maom)
-lm.maom <- lm(maom.stock ~ total_veg_residue_shoot + annual_legume_cc_shoot, data=all_data)
-summary(lm.maom)
-car::vif(lm.maom)
-
-### SIR x annual_cc_shoot
-lm.sir <- lm(substrate_induced_respiration ~ annual_cc_shoot, data=all_data)
-summary(lm.sir)
-
-class(lm.om) <- "lmerMod"
-class(lm.pom) <- "lmerMod"
-class(lm.maom) <- "lmerMod"
-class(lm.sir) <- "lmerMod"
-
-stargazer(lm.om, lm.maom, lm.pom, lm.sir, out="regression2.htm")
-
-
-
-###################################################################################
-
-###########################
-##### DEPRECATED CODE #####
-### MAINLY FOR PLOTTING ###
-###########################
-
-# ## Fig. S1 POM & MAOM C by cover crop type
-# all_data %>%
-#   filter(Cover_crop_freq=="Annually") %>%
-#   select(cover_crop,pom.stock,pom.n.stock,maom.stock,maom.n.stock,`substrate_induced_respiration`) %>%
-#   gather(-cover_crop,key="var",value="value")-> figs1.data
-# 
-# maom <- figs1.data %>% 
-#   filter(var=="maom.stock") %>%
-#   ggplot(aes(x = cover_crop, y = value)) +
-#   geom_boxplot() +
-#   geom_point(size = 1.5) +
-#   xlab("") + ylab("Mineral-associated C (Mg ha-1)") +
-#   theme_light() +
-#   theme(
-#     axis.ticks.x = element_blank(),
-#     axis.text.x = element_text(size = 11),
-#     strip.text.x = element_text(size = 12, face = "bold"),
-#     legend.position = "bottom"
-#   )
-# pom <- figs1.data %>% 
-#   filter(var=="pom.stock") %>%
-#   ggplot(aes(x = cover_crop, y = value)) +
-#   geom_boxplot() +
-#   geom_point(size = 1.5) +
-#   xlab("") + ylab("Particulate C (Mg ha-1)") +
-#   theme_light() +
-#   theme(
-#     axis.ticks.x = element_blank(),
-#     axis.text.x = element_text(size = 11),
-#     strip.text.x = element_text(size = 12, face = "bold"),
-#     legend.position = "bottom"
-#   )
-# sir <- figs1.data %>% 
-#   filter(var=="substrate_induced_respiration") %>%
-#   ggplot(aes(x = cover_crop, y = value)) +
-#   geom_boxplot() +
-#   geom_point(size = 1.5) +
-#   xlab("") + ylab("SIR (ug C g soil-1 h-1)") +
-#   theme_light() +
-#   theme(
-#     axis.ticks.x = element_blank(),
-#     axis.text.x = element_text(size = 11),
-#     strip.text.x = element_text(size = 12, face = "bold"),
-#     legend.position = "bottom"
-#   )
-
-
-
-# ## Fig. S2 Multi-panel of POM & MAOM N by all treatments
-# all_data %>%
-#   mutate(
-#     "Particulate nitrogen" = pom.n.stock,
-#     "Mineral-associated nitrogen" = maom.n.stock
-#   ) -> figs1.data
-# figs2.data$Compost <-
-#   recode(figs1.data$Compost,
-#          "No" = "No compost",
-#          "Yes" = "Compost")
-# figs2.data %>%  
-#   select(Compost, cover_crop, Cover_crop_freq, `Particulate nitrogen`:`Mineral-associated nitrogen`) %>%
-#   gather(-Compost, -cover_crop, -Cover_crop_freq, key = "var", value = "value") -> figs1.data
-# 
-# bar.colors <- c("#d9f0d3", "#f6e8c3")
-# point.colors <- c("#1b7837", "#8c510a")
-# 
-# pomN <- figs1.data %>% 
-#   filter(var == "Particulate nitrogen") %>%
-#   ggplot(aes(x = Compost, y = value, fill = Cover_crop_freq)) +
-#   geom_boxplot(size=0.25,outlier.shape=NA,position = position_dodge2(preserve = "single")) +
-#   scale_fill_manual(values = bar.colors, name = "Cover Crop Frequency") +
-#   geom_point(aes(color = Cover_crop_freq, shape = cover_crop),
-#              position=position_jitterdodge(),
-#              size = 1.5) +
-#   facet_grid(. ~ "Particulate nitrogen") +
-#   scale_color_manual(values = point.colors, name = "Cover Crop Frequency") +
-#   xlab("") + ylab("Particulate N (Mg ha-1 to 30 cm)") +
-#   theme_light() +
-#   guides(
-#     fill = guide_legend(
-#       title = "Cover Crop Frequency",
-#       title.position = "top",
-#       title.hjust = 0.5
-#     ),
-#     shape = guide_legend(
-#       title = "Cover Crop Type",
-#       title.position = "top",
-#       title.hjust = 0.5
-#     )
-#   ) +
-#   scale_shape(guide = FALSE) +
-#   theme(
-#     axis.ticks.x = element_blank(),
-#     axis.text.x = element_text(size = 11),
-#     strip.text.x = element_text(size = 12, face = "bold"),
-#     legend.position = "bottom"
-#   )
-# 
-# maomN <- figs1.data %>% 
-#   filter(var == "Mineral-associated nitrogen") %>%
-#   ggplot(aes(x = Compost, y = value, fill = Cover_crop_freq)) +
-#   geom_boxplot(size=0.25,outlier.shape=NA,position = position_dodge2(preserve = "single")) +
-#   scale_fill_manual(values = bar.colors, name = "Cover Crop Frequency") +
-#   geom_point(aes(color = Cover_crop_freq, shape = cover_crop),
-#              position=position_jitterdodge(),
-#              size = 1.5) +
-#   facet_grid(. ~ "Mineral-associated nitrogen") +
-#   scale_color_manual(values = point.colors, name = "Cover Crop Frequency") +
-#   xlab("") + ylab("Mineral-associated N (Mg ha-1 to 30 cm)") +
-#   theme_light() +
-#   guides(
-#     fill = guide_legend(
-#       title = "Cover Crop Frequency",
-#       title.position = "top",
-#       title.hjust = 0.5
-#     ),
-#     shape = guide_legend(
-#       title = "Cover Crop Type",
-#       title.position = "top",
-#       title.hjust = 0.5
-#     )
-#   ) +
-#   scale_shape(guide = FALSE) +
-#   theme(
-#     axis.ticks.x = element_blank(),
-#     axis.text.x = element_text(size = 11),
-#     strip.text.x = element_text(size = 12, face = "bold"),
-#     legend.position = "bottom"
-#   )
-
-# ## Fig. S3 Multi-panel of POM, MAOM, organic_matter, and SIR by all treatments
-# all_data %>%
-#   mutate(
-#     "Particulate carbon" = pom.stock,
-#     "Mineral-associated carbon" = maom.stock,
-#     "Total organic matter" = organic_matter,
-#     "Substrate-induced respiration" = substrate_induced_respiration
-#   ) -> figs3.data
-# figs3.data$Compost <-
-#   recode(figs1.data$Compost,
-#          "No" = "No compost",
-#          "Yes" = "Compost")
-# figs3.data %>%  
-#   select(Compost, cover_crop, Cover_crop_freq, `Particulate carbon`:`Substrate-induced respiration`) %>%
-#   gather(-Compost, -cover_crop, -Cover_crop_freq, key = "var", value = "value") -> figs1.data
-# 
-# bar.colors <- c("#d9f0d3", "#f6e8c3")
-# point.colors <- c("#1b7837", "#8c510a")
-# 
-# pom <- figs3.data %>% 
-#   filter(var == "Particulate carbon") %>%
-#   ggplot(aes(x = cover_crop, y = value, fill = Compost)) +
-#   geom_boxplot(size=0.25,
-#                outlier.shape=NA,
-#                position = position_dodge2(preserve = "single")) +
-#   scale_fill_manual(values = bar.colors, 
-#                     name = "Compost") +
-#   geom_point(aes(color = Compost, shape = Cover_crop_freq),
-#              position=position_jitterdodge(),
-#              size = 1.5) +
-#   facet_grid(. ~ "Particulate carbon") +
-#   scale_color_manual(values = point.colors, 
-#                      name = "Compost") +
-#   scale_shape(name="Cover crop frequency") +
-#   xlab("") + ylab("Particulate C (Mg ha-1 to 30 cm)") +
-#   theme_light() +
-#   guides(
-#     fill = guide_legend(
-#       title.position = "top",
-#       title.hjust = 0.5
-#     ),
-#     shape = guide_legend(
-#       title.position = "top",
-#       title.hjust = 0.5
-#     )
-#   ) +
-#   theme(
-#     axis.ticks.x = element_blank(),
-#     axis.text.x = element_text(size = 11),
-#     strip.text.x = element_text(size = 12, face = "bold"),
-#     legend.position = "bottom"
-#   )
-# 
-# maom <- figs3.data %>% 
-#   filter(var == "Mineral-associated carbon") %>%
-#   ggplot(aes(x = cover_crop, y = value, fill = Compost)) +
-#   geom_boxplot(size=0.25,
-#                outlier.shape=NA,
-#                position = position_dodge2(preserve = "single")) +
-#   scale_fill_manual(values = bar.colors, 
-#                     name = "Compost") +
-#   geom_point(aes(color = Compost, shape = Cover_crop_freq),
-#              position=position_jitterdodge(),
-#              size = 1.5) +
-#   facet_grid(. ~ "Mineral-associated carbon") +
-#   scale_color_manual(values = point.colors, 
-#                      name = "Compost") +
-#   scale_shape(name="Cover crop frequency") +
-#   xlab("") + ylab("Mineral-associated C (Mg ha-1 to 30 cm)") +
-#   theme_light() +
-#   guides(
-#     fill = guide_legend(
-#       title.position = "top",
-#       title.hjust = 0.5
-#     ),
-#     shape = guide_legend(
-#       title.position = "top",
-#       title.hjust = 0.5
-#     )
-#   ) +
-#   theme(
-#     axis.ticks.x = element_blank(),
-#     axis.text.x = element_text(size = 11),
-#     strip.text.x = element_text(size = 12, face = "bold"),
-#     legend.position = "bottom"
-#   )
-# 
-# tom <- figs3.data %>% 
-#   filter(var == "Total organic matter") %>%
-#   ggplot(aes(x = cover_crop, y = value, fill = Compost)) +
-#   geom_boxplot(size=0.25,
-#                outlier.shape=NA,
-#                position = position_dodge2(preserve = "single")) +
-#   scale_fill_manual(values = bar.colors, 
-#                     name = "Compost") +
-#   geom_point(aes(color = Compost, shape = Cover_crop_freq),
-#              position=position_jitterdodge(),
-#              size = 1.5) +
-#   facet_grid(. ~ "Total organic matter") +
-#   scale_color_manual(values = point.colors, 
-#                      name = "Compost") +
-#   scale_shape(name="Cover crop frequency") +
-#   xlab("") + ylab("Total organic matter (%)") +
-#   theme_light() +
-#   guides(
-#     fill = guide_legend(
-#       title.position = "top",
-#       title.hjust = 0.5
-#     ),
-#     shape = guide_legend(
-#       title.position = "top",
-#       title.hjust = 0.5
-#     )
-#   ) +
-#   theme(
-#     axis.ticks.x = element_blank(),
-#     axis.text.x = element_text(size = 11),
-#     strip.text.x = element_text(size = 12, face = "bold"),
-#     legend.position = "bottom"
-#   )
-# 
-# sir <- figs3.data %>% 
-#   filter(var == "Substrate-induced respiration") %>%
-#   ggplot(aes(x = cover_crop, y = value, fill = Compost)) +
-#   geom_boxplot(size=0.25,
-#                outlier.shape=NA,
-#                position = position_dodge2(preserve = "single")) +
-#   scale_fill_manual(values = bar.colors, 
-#                     name = "Compost") +
-#   geom_point(aes(color = Compost, shape = Cover_crop_freq),
-#              position=position_jitterdodge(),
-#              size = 1.5) +
-#   facet_grid(. ~ "Substrate-induced respiration") +
-#   scale_color_manual(values = point.colors, 
-#                      name = "Compost") +
-#   scale_shape(name="Cover crop frequency") +
-#   xlab("") + ylab("Substrate-induced respiration (ug C g soil-1 h-1)") +
-#   theme_light() +
-#   guides(
-#     fill = guide_legend(
-#       title.position = "top",
-#       title.hjust = 0.5
-#     ),
-#     shape = guide_legend(
-#       title.position = "top",
-#       title.hjust = 0.5
-#     )
-#   ) +
-#   theme(
-#     axis.ticks.x = element_blank(),
-#     axis.text.x = element_text(size = 11),
-#     strip.text.x = element_text(size = 12, face = "bold"),
-#     legend.position = "bottom"
-#   )
-
-
-# ## Fig. S4 Plot correlations among quantitative soil variables
-# ## Define the correlation matrix
-# fig6.data <- all_data %>% 
-#   select(organic_matter,perc_sand,perc_clay,pH,pom.stock,maom.stock,EC,`NO3-N`:`X-K`,`X-Ca`:`Zn (DTPA)`,CEC)
-# 
-# names(fig6.data) <- c("Organic matter","Sand","Clay","pH","Particulate C",
-#                       "Mineral C","Electric conductivity","Nitrate","Olsen's P","K","Ca","Mg","Zn","CEC")
-# 
-# ggcorr(fig6.data,
-#        nbreaks=6,
-#        hjust = 0.75, 
-#        size = 3, 
-#        label=T,
-#        label_size=4,
-#        label_alpha=T,
-#        layout.exp = 3) +
-#   theme(legend.title = element_text(size = 7),
-#         legend.text = element_text(size = 7)) 
-# 
-## OTHER CORRELATION FIGURE TYPES
-# ggcorr(fig6.data, nbreaks=5)
-# ggcorr(fig6.data, geom = "circle", nbreaks = 5,min_size=0, max_size=6)
-# ggcorr(fig6.data,
-#        hjust = 0.75, 
-#        size = 4, 
-#        label=T,
-#        label_size=2,
-#        label_alpha=T,
-#        geom="circle", 
-#        min_size=0, max_size=6,
-#        name = expression(rho), 
-#        legend.position = "bottom", 
-#        legend.size = 12,
-#        layout.exp = 1) +
-#   guides(fill = guide_colorbar(barwidth = 18, title.vjust = 0.75)) +
-#   theme(legend.title = element_text(size = 14))
-# 
-# ggcorr(fig6.data, 
-#        geom = "blank", 
-#        label = TRUE, 
-#        hjust = 0.75) +
-#   geom_point(size = 10, aes(color = coefficient < 0, alpha = abs(coefficient) > 0.25)) +
-#   scale_alpha_manual(values = c("TRUE" = 0.25, "FALSE" = 0)) +
-#   guides(color = FALSE, alpha = FALSE)
-
-# ## Fig. 2 Multi-panel of POM, MAOM, organic_matter, and SIR by all treatments
-# all_data %>%
-#   filter(cover_crop == "legume-rye") %>%
-#   mutate(
-#     "Particulate carbon" = pom.stock,
-#     "Mineral-associated carbon" = maom.stock,
-#     "Total organic matter" = organic_matter,
-#     "Substrate-induced respiration" = substrate_induced_respiration
-#   ) -> fig2.data
-# fig2.data$Compost <-
-#   recode(fig2.data$Compost,
-#          "No" = "No compost",
-#          "Yes" = "Compost")
-# fig2.data %>%  
-#   select(Compost, Cover_crop_freq, `Particulate carbon`:`Substrate-induced respiration`) %>%
-#   gather(-Compost, -Cover_crop_freq, key = "var", value = "value") -> fig2.data
-# 
-# bar.colors <- c("#d9f0d3", "#f6e8c3")
-# point.colors <- c("#1b7837", "#8c510a")
-# 
-# pom <- fig2.data %>% 
-#   filter(var == "Particulate carbon") %>%
-#   ggplot(aes(x = Compost, y = value, fill = Cover_crop_freq)) +
-#   geom_boxplot(size=0.25,outlier.shape=NA,position = position_dodge2(preserve = "single")) +
-#   scale_fill_manual(values = bar.colors, name = "Cover Crop Frequency") +
-#   geom_point(aes(color = Cover_crop_freq, shape = Compost),
-#              position=position_jitterdodge(),
-#              size = 1.5) +
-#   facet_grid(. ~ "Particulate carbon") +
-#   scale_color_manual(values = point.colors, name = "Cover Crop Frequency") +
-#   xlab("") + ylab("Particulate C (Mg ha-1 to 30 cm)") +
-#   theme_light() +
-#   guides(
-#     fill = guide_legend(
-#       title = "Cover Crop Frequency",
-#       title.position = "top",
-#       title.hjust = 0.5,
-#       override.aes = list(shape = c(16, 17))
-#     )
-#   ) +
-#   scale_shape(guide = FALSE) +
-#   theme(
-#     axis.ticks.x = element_blank(),
-#     axis.text.x = element_text(size = 11),
-#     strip.text.x = element_text(size = 12, face = "bold"),
-#     legend.position = "bottom"
-#   )
-# 
-# maom <- fig2.data %>% 
-#   filter(var == "Mineral-associated carbon") %>%
-#   ggplot(aes(x = Compost, y = value, fill = Cover_crop_freq)) +
-#   geom_boxplot(size=0.25,outlier.shape=NA,position = position_dodge2(preserve = "single")) +
-#   scale_fill_manual(values = bar.colors, name = "Cover Crop Frequency") +
-#   geom_point(aes(color = Cover_crop_freq, shape = Compost),
-#              position=position_jitterdodge(),
-#              size = 1.5) +
-#   facet_grid(. ~ "Mineral-associated carbon") +
-#   scale_color_manual(values = point.colors, name = "Cover Crop Frequency") +
-#   xlab("") + ylab("Mineral-associated C (Mg ha-1 to 30 cm)") +
-#   theme_light() +
-#   guides(
-#     fill = guide_legend(
-#       title = "Cover Crop Frequency",
-#       title.position = "top",
-#       title.hjust = 0.5,
-#       override.aes = list(shape = c(16, 17))
-#     )
-#   ) +
-#   scale_shape(guide = FALSE) +
-#   theme(
-#     axis.ticks.x = element_blank(),
-#     axis.text.x = element_text(size = 11),
-#     strip.text.x = element_text(size = 12, face = "bold"),
-#     legend.position = "bottom"
-#   )
-# 
-# tom <- fig2.data %>% 
-#   filter(var == "Total organic matter") %>%
-#   ggplot(aes(x = Compost, y = value, fill = Cover_crop_freq)) +
-#   geom_boxplot(size=0.25,outlier.shape=NA,position = position_dodge2(preserve = "single")) +
-#   scale_fill_manual(values = bar.colors, name = "Cover Crop Frequency") +
-#   geom_point(aes(color = Cover_crop_freq, shape = Compost),
-#              position=position_jitterdodge(),
-#              size = 1.5) +
-#   facet_grid(. ~ "Total organic matter") +
-#   scale_color_manual(values = point.colors, name = "Cover Crop Frequency") +
-#   xlab("") + ylab("Total organic matter (%)\n") +
-#   theme_light() +
-#   guides(
-#     fill = guide_legend(
-#       title = "Cover Crop Frequency",
-#       title.position = "top",
-#       title.hjust = 0.5,
-#       override.aes = list(shape = c(16, 17))
-#     )
-#   ) +
-#   scale_shape(guide = FALSE) +
-#   theme(
-#     axis.ticks.x = element_blank(),
-#     axis.text.x = element_text(size = 11),
-#     strip.text.x = element_text(size = 12, face = "bold"),
-#     legend.position = "bottom"
-#   ) 
-# 
-# sir <- fig2.data %>% filter(var == "Substrate-induced respiration") %>% 
-#   ggplot(aes(x = Compost, y = value, fill = Cover_crop_freq)) +
-#   geom_boxplot(size=0.25,outlier.shape=NA,position = position_dodge2(preserve = "single")) +  
-#   scale_fill_manual(values = bar.colors, name = "Cover Crop Frequency") +
-#   geom_point(aes(color = Cover_crop_freq, shape = Compost),
-#              position=position_jitterdodge(),
-#              size = 1.5) +
-#   facet_grid(. ~ "Substrate-induced respiration") +  
-#   scale_color_manual(values = point.colors, name = "Cover Crop Frequency") +
-#   xlab("") + ylab("Substrate-induced respiration (ug C h-1 g soil-1)") +
-#   theme_light() +
-#   guides(
-#     fill = guide_legend(
-#       title = "Cover Crop Frequency",
-#       title.position = "top",
-#       title.hjust = 0.5,
-#       override.aes = list(shape = c(16, 17))
-#     )
-#   ) +
-#   scale_shape(guide = FALSE) +
-#   theme(
-#     axis.ticks.x = element_blank(),
-#     axis.text.x = element_text(size = 11),
-#     strip.text.x = element_text(size = 12, face = "bold"),
-#     legend.position = "bottom"
-#   )
-# 
-# # Fig 3: MAOM C & POM C on same scale
-# all_data %>%
-#   filter(cover_crop == "legume-rye") %>%
-#   mutate(
-#     "Particulate carbon" = pom.stock,
-#     "Mineral-associated carbon" = maom.stock
-#   ) -> fig3.data
-# fig3.data$Compost <-
-#   recode(fig3.data$Compost,
-#          "No" = "No compost",
-#          "Yes" = "Compost")
-# fig3.data %>%
-#   select(Compost, Cover_crop_freq, `Particulate carbon`,`Mineral-associated carbon`) %>%
-#   gather(-Compost, -Cover_crop_freq, key = "var", value = "value") -> fig3.data
-# 
-# fig3.data %>%
-#   ggplot(aes(x = Compost, y = value, fill = Cover_crop_freq)) +
-#   geom_boxplot(size=0.25,outlier.shape=NA,position = position_dodge2(preserve = "single")) +
-#   scale_fill_manual(values = bar.colors, name = "Cover Crop Frequency") +
-#   geom_point(aes(color = Cover_crop_freq, shape = Compost),
-#              position=position_jitterdodge(),
-#              size = 1.5) +
-#   scale_color_manual(values = point.colors, name = "Cover Crop Frequency") +
-#   facet_wrap(~var) + xlab("") + ylab("Carbon stock (Mg C ha-1 to 30 cm)") +
-#   theme_light() +
-#   guides(
-#     fill = guide_legend(
-#       title = "Cover Crop Frequency",
-#       title.position = "top",
-#       title.hjust = 0.5,
-#       override.aes = list(shape = c(16, 17))
-#     )
-#   ) +
-#   scale_shape(guide = FALSE) +
-#   theme(
-#     axis.ticks.x = element_blank(),
-#     axis.text.x = element_text(size = 11),
-#     strip.text.x = element_text(size = 12, face = "bold"),
-#     legend.position = "bottom"
-#   )
-# #### Plot pairs for organic matter variables ####
-# ### Function to generate subsetted data frame from random forest list
-# pairs.rf <- function(data,resp,rf,n) {
-#   data %>%
-#     select(resp,total_compost:total_C_no_roots_no_exudates) -> temp
-#   temp[, c(
-#     1,
-#     (rf[[n]]$varselect.pred %>%
-#        as.numeric()
-#      + 1)
-#   )     ] %>%
-#     return()
-# }
-# 
-# pairs.rf(data=all_data,
-#     resp="organic_matter",
-#          rf=rf.res,
-#          n=1) %>%
-#   rename("Soil organic matter"=organic_matter,
-#          "Total carbon input"=total_C_no_roots_no_exudates,
-#          "Total compost input"=total_compost) %>%
-#   ggscatmat() + 
-#   theme_light()
-# 
-# pairs.rf(data=all_data,
-#          resp="pom.stock",
-#          rf=rf.res,
-#          n=4) %>%
-#   rename("Fresh organic matter input"=fresh_om,
-#          "Particulate carbon"=pom.stock) %>%
-#   ggscatmat() +
-#   theme_light()
-
-#### ####
-
-coef(lm.om)
-
-a = format(coef(lm(organic_matter ~ tom , data=all_data))[1], digits = 2)
-b = format(coef(lm(organic_matter ~ tom , data=all_data))[2], digits = 1)
-r2 = format(summary(lm(organic_matter ~ tom , data=all_data))$r.squared, digits = 2)
-
-all_data %>%
-  ggplot(aes(x=tom, y=organic_matter)) + 
-  geom_point(aes(shape=Cover_crop_freq),size=2.5, alpha=0.75) + 
-  geom_abline(intercept=1.902288611, slope=0.04871383)+
-  annotate("text", x = 12, y = 3.2, label = paste0('y = ',a,' + ',b,'*x ',', R',"^",'2 = ',r2)) +
-  ylab("Organic matter (%)") + xlab("Annualized organic inputs (t ha-1 y-1)") +
-  theme_bw() +
-  guides(shape=guide_legend(title="Cover Crop Frequency")) +
-  theme(
-    axis.ticks.x = element_blank(),
-    axis.text.x = element_text(size = 11),
-    strip.text.x = element_text(size = 12, face = "bold"),
-    legend.position = c(0.2, 0.85)
-  ) -> Fig5a
+stargazer(mgmt.model, resid.model.ca, out="maom.htm")
 Fig5a
