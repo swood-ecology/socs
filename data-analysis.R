@@ -121,8 +121,6 @@ all_data %>%
     sd_blkden=sd(blkden),
     mean_om=mean(organic_matter),
     sd_om=sd(organic_matter),
-    mean_totC=mean(totC.stock),
-    sd_totC=sd(totC.stock),
     mean_POMC=mean(`POM C`),
     sd_POMC=sd(`POM C`),
     mean_POMC_stock=mean(pom.stock),
@@ -144,53 +142,11 @@ all_data %>%
     mean_MAOMCN=mean(`MAOM_CN`),
     sd_MAOMCN=sd(`MAOM_CN`),
     mean_WHC=mean(water_holding_capacity, na.rm=T),
-    sd_WHC=sd(water_holding_capacity, na.rm=T)
+    sd_WHC=sd(water_holding_capacity, na.rm=T),
+    mean_SIR=mean(substrate_induced_respiration, na.rm=T),
+    sd_SIR=sd(substrate_induced_respiration, na.rm=T)
   ) %>%
   write_excel_csv("tables/table1.csv")
-
-all_data %>%
-  filter(cover_crop=="legume-rye") %>%
-  select(cover_crop:POM_CN,blkden,totC.stock,maom.stock,pom.stock,maom.n.stock,pom.n.stock) %>%
-  group_by(Compost,Cover_crop_freq) %>%
-  summarise(
-    mean_sand=mean(perc_sand),
-    sd_sand=sd(perc_sand),
-    mean_silt=mean(perc_silt),
-    sd_silt=sd(perc_silt),
-    mean_clay=mean(perc_clay),
-    sd_clay=sd(perc_clay),
-    mean_pH=mean(pH),
-    sd_pH=sd(pH),
-    mean_blkden=mean(blkden),
-    sd_blkden=sd(blkden),
-    mean_om=mean(organic_matter),
-    sd_om=sd(organic_matter),
-    mean_totC=mean(totC.stock),
-    sd_totC=sd(totC.stock),
-    mean_POMC=mean(`POM C`),
-    sd_POMC=sd(`POM C`),
-    mean_POMC_stock=mean(pom.stock),
-    sd_POMC_stock=sd(pom.stock),
-    mean_POMN=mean(`POM N`),
-    sd_POMN=sd(`POM N`),
-    mean_POMN_stock=mean(pom.n.stock),
-    sd_POMN_stock=sd(pom.n.stock),
-    mean_POMCN=mean(`POM_CN`),
-    sd_POMCN=sd(`POM_CN`),
-    mean_MAOMC=mean(`MAOM C`),
-    sd_MAOMC=sd(`MAOM C`),
-    mean_MAOMC_stock=mean(`maom.stock`),
-    sd_MAOMC_stock=sd(`maom.stock`),
-    mean_MAOMN=mean(`MAOM N`),
-    sd_MAOMN=sd(`MAOM N`),
-    mean_MAOMN_stock=mean(`maom.n.stock`),
-    sd_MAOMN_stock=sd(`maom.n.stock`),
-    mean_MAOMCN=mean(`MAOM_CN`),
-    sd_MAOMCN=sd(`MAOM_CN`),
-    mean_WHC=mean(water_holding_capacity, na.rm=T),
-    sd_WHC=sd(water_holding_capacity, na.rm=T)
-  ) %>% select(mean_om, sd_om) %>%
-  write_excel_csv("tables/table1_filtered.csv")
 
 
 ## Fig. 1. Cumulative inputs
@@ -312,6 +268,13 @@ lmer(maom.n.stock ~ Compost + Cover_crop_freq + (1|Replicate),
 summary(maom.n.model)
 r.squaredGLMM(maom.n.model)
 
+lmer(substrate_induced_respiration ~ Compost + Cover_crop_freq + (1|Replicate),
+     data = fig2model
+) -> sir.model
+summary(sir.model)
+r.squaredGLMM(sir.model)
+
+
 class(om.model) <- "lmerMod"
 class(pom.model) <- "lmerMod"
 class(pom.n.model) <- "lmerMod"
@@ -426,4 +389,64 @@ effect_plot(model=resid.model.ca, pred = Mn, colors=all_data$System,
             x.label = "Manganese", y.label = "First-stage model residuals")
 
 stargazer(mgmt.model, resid.model.ca, out="maom.htm")
-Fig5a
+
+
+
+#### CONTINUOUS INPUT MODELS ####
+rf.res <- list(
+  VSURF(
+    y = all_data$organic_matter,
+    x = all_data %>%
+      select(total_compost:total_C_no_roots_no_exudates),
+    parallel = TRUE
+  ),
+  VSURF(
+    y = all_data$pom.stock,
+    x = all_data %>%
+      select(total_compost:total_C_no_roots_no_exudates),
+    parallel = TRUE
+  ),
+  VSURF(
+    y = all_data$maom.stock,
+    x = all_data %>%
+      select(total_compost:total_C_no_roots_no_exudates),
+    parallel = TRUE
+  ),
+  VSURF(
+    y = all_data$substrate_induced_respiration,
+    x = all_data %>%
+      select(total_compost:total_C_no_roots_no_exudates),
+    parallel = TRUE
+  )
+)
+
+for(i in 1:length(rf.res)){
+  vars = rf.res[[i]]$varselect.interp
+  # Print the response variable
+  print(rf.res[[i]]$call$y)
+  # Print the predictor variables selected
+  all_data %>% 
+    select(total_compost:total_C_no_roots_no_exudates) %>%
+    select(vars) %>% names() %>% print()
+}
+
+# Organic matter
+lm.om <- lm(organic_matter ~ total_C_no_roots_no_exudates + total_om + total_cc_shoot + fresh_om_perc, data=all_data)
+summary(lm.om)
+car::vif(lm.om)
+
+lm.om <- lm(organic_matter*100 ~ total_om , data=all_data)
+summary(lm.om)
+car::vif(lm.om)
+
+# Particulate
+lm.pom <- lm(pom.stock ~ fresh_om, data=all_data)
+summary(lm.pom)
+
+# Mineral
+lm.maom <- lm(maom.stock ~ total_veg_residue_shoot + annual_legume_cc_shoot, data=all_data)
+summary(lm.maom)
+
+# SIR
+lm.sir <- lm(substrate_induced_respiration ~ total_veg_residue_shoot, data=all_data)
+summary(lm.sir)
