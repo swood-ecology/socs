@@ -4,15 +4,13 @@ library(readxl)       # For reading in .xls files
 library(lme4)         # For mixed-effects regression
 library(lmerTest)     # For p-value calculations of lmer models
 library(performance)  # For R2
+library(simr)         # For power analysis
 
-
-# library(VSURF)        # For random forest model selection
 # library(doBy)
 # library(grid)         # For manipulating details of ggplot
 # library(sjstats)
 # library(stargazer)    # For generating HTML tables for export
 # library(jtools)       # For interaction plots
-# library(simr)         # For power analysis
 
 
 # FUNCTIONS
@@ -82,22 +80,19 @@ all_data <- full_join(total.c, pom.data)
 
 # Table 2 & 3
 # Replace variable for all variables in the model
-aggregate(POM_CN ~ `mgmt-2`+`mgmt-3`+`mgmt-4`,FUN=mean,data=pom.y8)
+aggregate(C_kg_Mg ~ `mgmt-2`+`mgmt-3`+`mgmt-4`,FUN=mean,data=total.y8)
 
 ## Calculate difference
-diff.data <- pom.data %>% group_by(unique) %>% arrange(year, .by_group = TRUE) %>%
-  mutate(POMCdiff = last(POMC_Mg_ha) - first(POMC_Mg_ha),
-         MAOMCdiff = last(MAOMC_Mg_ha) - first(MAOMC_Mg_ha),
+diff.data <- all_data %>% group_by(unique) %>% arrange(year, .by_group = TRUE) %>%
+  mutate(POMCdiff = last(`POMC (mg g-1)`) - first(`POMC (mg g-1)`),
+         MAOMCdiff = last(`MAOMC (mg g-1)`) - first(`MAOMC (mg g-1)`),
          POMCNdiff = last(POM_CN) - first(POM_CN),
          MAOMCNdiff = last(MAOM_CN) - first(MAOM_CN),
          d13CPOMdiff = last(d13CPOM) - first(d13CPOM),
-         d13CMAOMdiff = last(d13CMAOM) - first(d13CMAOM)) %>%
-  select(`mgmt-1`:d13CMAOMdiff) %>% unique()
-
-diff.total <- total.c %>% group_by(unique) %>% arrange(year, .by_group = TRUE) %>%
-  mutate(Cdiff = last(C_Mg_ha) - first(C_Mg_ha),
+         d13CMAOMdiff = last(d13CMAOM) - first(d13CMAOM),
+         Cdiff = last(`C_kg_Mg`) - first(`C_kg_Mg`),
          d13Cdiff = last(d13C) - first(d13C)) %>%
-  select(`mgmt-1`:d13Cdiff) %>% unique()
+  select(`mgmt-1`:`mgmt-5`,POMCdiff:d13Cdiff) %>% unique()
 
 # ANALYSES #
 ## Davis Total C % vs. sum of POM & MIN %
@@ -116,8 +111,10 @@ ggplot(davis,aes(x=sumFraction,y=perC_Davis)) + geom_point(size = 2.5, alpha=0.7
     axis.text.y = element_text(size=12)
   )
 
+lm(perC_Davis ~ sumFraction,data=davis) %>% summary()
 
-## Response of change in variables to treatment
+
+## Response of change in variables to treatment over time
 ### Fractions
 maomdiff <- lmer(MAOMCdiff ~ `mgmt-3` + `mgmt-4` + (1|`mgmt-5`), data=diff.data)
 maomdiff %>% r2()
@@ -135,7 +132,7 @@ pomcndiff <- lmer(POMCNdiff ~ `mgmt-3` + `mgmt-4` + (1|`mgmt-5`), data=diff.data
 pomcndiff %>% r2()
 summary(pomcndiff)
 
-cdiff <- lmer(Cdiff ~ `mgmt-3` + `mgmt-4` + (1|`mgmt-5`), data=diff.total)
+cdiff <- lmer(Cdiff ~ `mgmt-3` + `mgmt-4` + (1|`mgmt-5`), data=diff.data)
 cdiff %>% r2()
 summary(cdiff)
 
@@ -148,19 +145,57 @@ pomd13cdiff <- lmer(d13CPOMdiff ~ `mgmt-3` + `mgmt-4` + (1|`mgmt-5`), data=diff.
 pomd13cdiff %>% r2()
 summary(pomd13cdiff)
 
-d13cdiff <- lmer(d13Cdiff ~ `mgmt-3` + `mgmt-4` + (1|`mgmt-5`), data=diff.total)
+d13cdiff <- lmer(d13Cdiff ~ `mgmt-3` + `mgmt-4` + (1|`mgmt-5`), data=diff.data)
 d13cdiff %>% r2()
 summary(d13cdiff)
 
-## FIGURES ##
-fig2data <- all_data %>% select(year,d13C:`mgmt-1`,Total_CN,C_Mg_ha,unique,d13CPOM,d13CMAOM,POMC_Mg_ha:MAOM_CN)
 
-# fig1data <- fig1data %>% select(-unique) %>% 
-#   pivot_longer(cols = c("d13C","Total_CN","d13CPOM","d13CMAOM","POMC_stock","MAOMC_stock","POMN_stock","MAOMN_stock","POM_CN","MAOM_CN"), 
-#                names_to = "variables", values_to = "values")
+## Response of treatment in year 8
+### Fractions
+maom <- lmer(`MAOMC (mg g-1)` ~ `mgmt-3` + `mgmt-4` + (1|`mgmt-5`), data=pom.y8)
+maom %>% r2()
+summary(maom)
+
+pom <- lmer(`POMC (mg g-1)` ~ `mgmt-3` + `mgmt-4` + (1|`mgmt-5`), data=pom.y8)
+pom %>% r2()
+summary(pom)
+
+maomcn <- lmer(MAOM_CN ~ `mgmt-3` + `mgmt-4` + (1|`mgmt-5`), data=pom.y8)
+maomcn %>% r2()
+summary(maomcn)
+
+pomcn <- lmer(POM_CN ~ `mgmt-3` + `mgmt-4` + (1|`mgmt-5`), data=pom.y8)
+pomcn %>% r2()
+summary(pomcn)
+
+totalc <- lmer(C_kg_Mg ~ `mgmt-3` + `mgmt-4` + (1|`mgmt-5`), data=total.y8)
+totalc %>% r2()
+summary(totalc)
+
+### Isotopes
+maomd13c <- lm(d13CMAOM ~ `mgmt-3` + `mgmt-4`, data=pom.y8 )
+maomd13c %>% r2()
+summary(maomd13c)
+
+pomd13c <- lm(d13CPOM ~ `mgmt-3` + `mgmt-4` , data=pom.y8 )
+pomd13c %>% r2()
+summary(pomd13c)
+
+d13c <- lmer(d13C ~ `mgmt-3` + `mgmt-4` + (1|`mgmt-5`), data=total.y8 )
+d13c %>% r2()
+summary(d13c)
+
+
+## FIGURES ##
+fig2data <- all_data %>% select(year,d13C:`mgmt-1`,`POMC (mg g-1)`,`MAOMC (mg g-1)`,Total_CN,C_Mg_ha,unique,d13CPOM,d13CMAOM,POMC_Mg_ha:MAOM_CN)
 
 fig2data$year <- as.factor(fig2data$year)
 fig2data$year <- recode(fig2data$year, '0' = '2003', '8' = '2011')
+
+diff.data.numbers <- diff.data %>% select(Cdiff,MAOMCdiff,POMCdiff,POMCNdiff,MAOMCNdiff,
+                                          d13Cdiff,d13CPOMdiff,d13CMAOMdiff,`mgmt-1`)
+
+Rmisc::summarySE(diff.data.numbers, measurevar="MAOMCdiff", groupvars=c('`mgmt-1`')) %>% select(-N,-sd,-se)
 
 ### FIGURE 3 ###
 ## d13C
@@ -168,7 +203,7 @@ fig3aData <- Rmisc::summarySE(fig2data, measurevar="d13C", groupvars=c('year','`
 
 d13C_plot <- ggplot(fig3aData, aes(x=`mgmt-1`, y=d13C, fill=year))+
   geom_bar(position=position_dodge(), stat="identity", colour='black') +
-  geom_errorbar(aes(ymin=d13C-ci, ymax=d13C+ci), width=.2,position=position_dodge(.9)) +
+  geom_errorbar(aes(ymin=d13C-ci, ymax=d13C+ci), width=.2, position=position_dodge(.9)) +
   geom_point(data=fig2data,aes(y=d13C,x=`mgmt-1`), position=position_dodge(0.9), alpha=0.4) +
   coord_cartesian(ylim=c(-28,-26)) + ylab(expression(Delta*"13C")) +
   scale_fill_manual(values=c("#999999", "#E69F00"), name = "Year") +
@@ -221,13 +256,13 @@ d13CMAOM_plot
 ### FIGURE 2 ###
 
 ## Total C
-fig1aData <- Rmisc::summarySE(fig2data, measurevar="C_Mg_ha", groupvars=c('year','`mgmt-1`')) %>% select(-N,-sd,-se)
+fig1aData <- Rmisc::summarySE(fig2data, measurevar="C_kg_Mg", groupvars=c('year','`mgmt-1`')) %>% select(-N,-sd,-se)
 
-TotalC_plot <- ggplot(fig1aData, aes(x=`mgmt-1`, y=C_Mg_ha, fill=year))+
+TotalC_plot <- ggplot(fig1aData, aes(x=`mgmt-1`, y=C_kg_Mg, fill=year))+
   geom_bar(position=position_dodge(), stat="identity", colour='black') +
-  geom_errorbar(aes(ymin=C_Mg_ha-ci, ymax=C_Mg_ha+ci), width=.2,position=position_dodge(0.9)) +
-  geom_point(data=fig2data,aes(y=C_Mg_ha,x=`mgmt-1`), position=position_dodge(0.9), alpha=0.5) +
-  coord_cartesian(ylim=c(0,80)) + ylab("Total carbon stock (Mg per ha)\n") +
+  geom_errorbar(aes(ymin=C_kg_Mg-ci, ymax=C_kg_Mg+ci), width=.2,position=position_dodge(0.9)) +
+  geom_point(data=fig2data,aes(y=C_kg_Mg,x=`mgmt-1`), position=position_dodge(0.9), alpha=0.5) +
+  coord_cartesian(ylim=c(0,21)) + ylab("Total carbon (kg per Mg)\n") +
   scale_fill_manual(values=c("#999999", "#E69F00"), name = "Year") +
   theme_bw() +
   theme(
@@ -240,13 +275,13 @@ TotalC_plot
 
 
 ## POM C
-fig1bData <- Rmisc::summarySE(fig2data, measurevar="POMC_Mg_ha", groupvars=c('year','`mgmt-1`')) %>% select(-N,-sd,-se)
+fig1bData <- Rmisc::summarySE(fig2data, measurevar="POMC (mg g-1)", groupvars=c('year','`mgmt-1`')) %>% select(-N,-sd,-se)
 
-POMC_plot <- ggplot(fig1bData, aes(x=`mgmt-1`, y=POMC_Mg_ha, fill=year))+
+POMC_plot <- ggplot(fig1bData, aes(x=`mgmt-1`, y=`POMC (mg g-1)`, fill=year))+
   geom_bar(position=position_dodge(), stat="identity", colour='black') +
-  geom_errorbar(aes(ymin=POMC_Mg_ha-ci, ymax=POMC_Mg_ha+ci), width=.2, position=position_dodge(.9)) +
-  geom_point(data=fig2data,aes(y=POMC_Mg_ha,x=`mgmt-1`), position=position_dodge(0.9), alpha=0.5) +
-  ylab("POM C (Mg per ha)\n") +
+  geom_errorbar(aes(ymin=`POMC (mg g-1)`-ci, ymax=`POMC (mg g-1)`+ci), width=.2, position=position_dodge(.9)) +
+  geom_point(data=fig2data,aes(y=`POMC (mg g-1)`,x=`mgmt-1`), position=position_dodge(0.9), alpha=0.5) +
+  ylab("POM C (mg per g)\n") +
   scale_fill_manual(values=c("#999999", "#E69F00"), name = "Year") +
   theme_bw() +
   theme(
@@ -259,13 +294,13 @@ POMC_plot
 
 
 ## MAOM C
-fig1cData <- Rmisc::summarySE(fig2data, measurevar="MAOMC_Mg_ha", groupvars=c('year','`mgmt-1`')) %>% select(-N,-sd,-se)
+fig1cData <- Rmisc::summarySE(fig2data, measurevar="MAOMC (mg g-1)", groupvars=c('year','`mgmt-1`')) %>% select(-N,-sd,-se)
 
-MAOMC_plot <- ggplot(fig1cData, aes(x=`mgmt-1`, y=MAOMC_Mg_ha, fill=year))+
+MAOMC_plot <- ggplot(fig1cData, aes(x=`mgmt-1`, y=`MAOMC (mg g-1)`, fill=year))+
   geom_bar(position=position_dodge(), stat="identity", colour='black') +
-  geom_errorbar(aes(ymin=MAOMC_Mg_ha-ci, ymax=MAOMC_Mg_ha+ci), width=.2,position=position_dodge(.9)) + 
-  geom_point(data=fig2data,aes(y=MAOMC_Mg_ha,x=`mgmt-1`), position=position_dodge(0.9), alpha=0.5) +
-  ylab("MAOM C (Mg per ha)\n") +
+  geom_errorbar(aes(ymin=`MAOMC (mg g-1)`-ci, ymax=`MAOMC (mg g-1)`+ci), width=.2,position=position_dodge(.9)) + 
+  geom_point(data=fig2data,aes(y=`MAOMC (mg g-1)`,x=`mgmt-1`), position=position_dodge(0.9), alpha=0.5) +
+  ylab("MAOM C (mg per g)\n") +
   scale_fill_manual(values=c("#999999", "#E69F00"), name = "Year") +
   theme_bw() +
   theme(
@@ -309,3 +344,54 @@ MAOMCN_plot <- ggplot(fig1eData, aes(x=`mgmt-1`, y=MAOM_CN, fill=year))+
     axis.title.y = element_text(size=13)
   )
 MAOMCN_plot
+
+
+#####POWER ANALYSIS#####
+simrOptions(progress=FALSE)
+
+diff.data %>%
+  mutate(Rep = case_when(`mgmt-5`=='Rep 1' ~ 1,
+                         `mgmt-5`=='Rep 2' ~ 2,
+                         `mgmt-5`=='Rep 3' ~ 3,
+                         `mgmt-5`=='Rep 4' ~ 4
+  )) %>%
+  fastDummies::dummy_cols() -> power.data
+
+lmer(POMCdiff ~ `mgmt-3` + `mgmt-4` + (1|Rep),
+     data = power.data
+) -> model1
+
+compostPOM <- powerSim(model1, nsim=100, test = fcompare(y~`mgmt-3`))
+compostPOM
+ccPOM <- powerSim(model1, nsim=100, test = fcompare(y~`mgmt-4`))
+ccPOM
+
+mod = lm(POMCdiff ~ `mgmt-3` + `mgmt-4`, data=diff.data)  
+car::Anova(mod,type="III")
+etasq <- 2.1424/(2.1424+4.8964)
+f2 <- etasq / (1-etasq)
+pwr::pwr.f2.test(u=1,v=17,f2=f2,sig.level=0.05)
+
+etasq <- 0.6888/(0.6888+4.8964)
+f2 <- etasq / (1-etasq)
+pwr::pwr.f2.test(u=1,v=17,f2=f2,sig.level=0.05)
+
+mod = lm(MAOMCdiff ~ `mgmt-3` + `mgmt-4`, data=diff.data)  
+car::Anova(mod,type="III")
+etasq <- 1.3041/(1.3041+7.5853)
+f2 <- etasq / (1-etasq)
+pwr::pwr.f2.test(u=1,v=17,f2=f2,sig.level=0.05)
+
+etasq <- 3.5589/(3.5589+7.5853)
+f2 <- etasq / (1-etasq)
+pwr::pwr.f2.test(u=1,v=17,f2=f2,sig.level=0.05)
+
+mod = lm(Cdiff ~ `mgmt-3` + `mgmt-4`, data=diff.data)  
+car::Anova(mod,type="III")
+etasq <- 22.4450/(22.4450+29.0175)
+f2 <- etasq / (1-etasq)
+pwr::pwr.f2.test(u=1,v=17,f2=f2,sig.level=0.05)
+
+etasq <- 5.8800/(5.8800+29.0175)
+f2 <- etasq / (1-etasq)
+pwr::pwr.f2.test(u=1,v=17,f2=f2,sig.level=0.05)
